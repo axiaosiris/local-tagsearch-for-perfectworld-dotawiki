@@ -1,0 +1,27 @@
+# ---- 数据快照（由 refresh.sh 抓取生成，不随仓库分发）----
+data.js
+_raw.json
+*.crdownload
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# ---- Node ----
+node_modules/
+npm-debug.log*
+
+# ---- 临时 / 调试 ----
+_scratch/
+*.tmp
+*.log
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
