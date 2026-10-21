@@ -1,6 +1,14 @@
-# 技能 Tag 检索器（tagsearch）
+# local tagsearch for perfectworld dotawiki
 
-按 **Tag**（标签）离线检索 DOTA2-WIKI 技能条目的本地工具。纯静态页面，双击 `index.html` 即用，检索过程无需联网、无需后台。
+本地技能 Tag 检索器 —— 按 **Tag**（标签）离线检索 DOTA2-WIKI 技能条目。纯静态页面，双击 `index.html` 即用，检索过程无需联网、无需后台。
+
+```bash
+git clone git@github.com:axiaosiris/local-tagsearch-for-perfectworld-dotawiki.git
+cd local-tagsearch-for-perfectworld-dotawiki
+# 首次使用：抓取数据（详见「四、更新数据」）
+bash refresh.sh        # 或 Windows 下双击 refresh.bat
+# 之后双击 index.html 即可
+```
 
 > **仓库只含代码，不含数据快照。** `data.js` / `_raw.json` 已写入 `.gitignore` —— 数据源为 DOTA2-WIKI 后台（`partner.dota2.com.cn`），需具备该后台账号与登录态，且**不随本仓库分发**。首次使用请先按「四、更新数据」抓取一次。
 >
