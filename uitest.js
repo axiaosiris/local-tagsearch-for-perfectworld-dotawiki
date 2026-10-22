@@ -149,7 +149,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(doc.querySelectorAll('#tblbox table').length === 1 && !doc.querySelector('#tblbox table.cmp'),
       '默认是详细展示（表格无 .cmp 类）');
     const fullTds = doc.querySelectorAll('#tblbox tbody tr')[0].querySelectorAll('td').length;
-    ok(fullTds === 6, '详细模式每行 6 列（升级项/技能/ID/命中详情/tag 数/详情）', fullTds);
+    ok(fullTds === 7, '详细模式每行 7 列（升级项/技能/ID/施法前摇/命中详情/tag 数/详情）', fullTds);
 
     btnView.dispatchEvent(new window.Event('click', { bubbles: true }));
     ok(doc.querySelectorAll('#tblbox .cmpgrid').length === 1 && !doc.querySelector('#tblbox thead'),
@@ -354,7 +354,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(+doc.getElementById('nHit').textContent === nTag, '切回 Tag 模式还原原结果（不受注释检索影响）',
       doc.getElementById('nHit').textContent + ' vs ' + nTag);
     const tThs = Array.prototype.map.call(doc.querySelectorAll('#tblbox thead th'), (t) => t.textContent);
-    ok(/命中详情/.test(tThs[3]), 'Tag 模式表头仍为「命中详情」', tThs.join(' / '));
+    ok(tThs.includes('命中详情') && !tThs.includes('命中行（注释原文）'), 'Tag 模式表头仍为「命中详情」', tThs.join(' / '));
     ok(doc.querySelectorAll('#tblbox .nline').length === 0, 'Tag 模式不残留注释行');
 
     mNote.dispatchEvent(new window.Event('click', { bubbles: true }));
@@ -377,6 +377,252 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
       doc.getElementById('noteWarn').textContent.trim().slice(0, 30));
     ok(doc.getElementById('mNotes').textContent === '无', '页头注释数显示「无」',
       doc.getElementById('mNotes').textContent);
+
+    // ================= 施法前摇筛选（可与 tag 条件同时使用） =================
+    const cpDb = {
+      fetchedAt: '2026-10-22T00:00:00.000Z',
+      tags: [{ id: 488, name: '治疗', c1: '机制', c2: '包含效果' },
+             { id: 489, name: '护盾', c1: '机制', c2: '包含效果' }],
+      notePool: [],
+      abilities: [
+        { i: 9301, n: '零前摇', en: 'a0', d: [488], g: [], m: [], e: [], cp: '0' },
+        { i: 9302, n: '零点二', en: 'a2', d: [488], g: [], m: [], e: [], cp: '0.2' },
+        { i: 9303, n: '零点一五', en: 'a15', d: [488, 489], g: [], m: [], e: [], cp: '0.15' },
+        { i: 9304, n: '零带备注', en: 'a0n', d: [488], g: [], m: [], e: [], cp: '0（魔晶）' },
+        { i: 9305, n: '无前摇数据', en: 'an', d: [488], g: [], m: [], e: [] },
+        { i: 9306, n: '双值技能', en: 'am', d: [488], g: [], m: [], e: [], cp: '0.67/0.5（古龙形态）' }
+      ]
+    };
+    window.__tagsearch.applyDb(cpDb, '合成测试数据（前摇）');
+    mTag.dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    ok(!!doc.getElementById('cpMin') && !!doc.getElementById('cpMax'), '左栏存在「施法前摇」最小/最大输入框');
+    ok(!!doc.getElementById('cpEq0') && !!doc.getElementById('cpLe015') && !!doc.getElementById('cpReset'),
+      '存在前摇快捷按钮（=0 / ≤0.15 / 清空）');
+
+    const cpMin = doc.getElementById('cpMin'), cpMax = doc.getElementById('cpMax');
+    const tagInp3 = doc.querySelector('.grp[data-k="and"] .rows input');
+    const runBtn = doc.getElementById('btnRun');
+    const cpNames = () => Array.prototype.map.call(
+      doc.querySelectorAll('#tblbox tbody td.nm'), (e) => e.textContent.replace(/[#\d]/g, '').replace(/[a-z_]+$/, '').trim());
+
+    // ① 0~0 = 恰为 0（含「0（魔晶）」这种带备注的写法），排除 0.2 / 0.15 / 无数据
+    tagInp3.value = '治疗';
+    tagInp3.dispatchEvent(new window.Event('input', { bubbles: true }));
+    cpMin.value = '0'; cpMax.value = '0';
+    runBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 2, '「0~0」= 前摇恰为 0（2 个）',
+      doc.getElementById('nHit').textContent);
+    ok(/零带备注/.test(doc.getElementById('tblbox').textContent) &&
+       !/零点二/.test(doc.getElementById('tblbox').textContent),
+      '「0（魔晶）」按 0 处理，0.2 被排除');
+
+    // ② 0~0.15 含端点
+    cpMin.value = '0'; cpMax.value = '0.15';
+    runBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 3, '「0~0.15」含端点 0.15（3 个）',
+      doc.getElementById('nHit').textContent);
+
+    // ③ 表头有「施法前摇」列且显示原值
+    ok(/施法前摇/.test(doc.querySelector('#tblbox thead').textContent), '详细表新增「施法前摇」列');
+    const cpCells = Array.prototype.map.call(doc.querySelectorAll('#tblbox tbody td.cpcell'), (e) => e.textContent.trim());
+    ok(cpCells.includes('0.15'), '前摇列显示后台原值', cpCells.join(' / '));
+
+    // ④ 无数据技能被排除并提示数量
+    ok(/无施法前摇数据/.test(doc.getElementById('tblbox').textContent), '提示「无施法前摇数据」被排除的数量');
+
+    // ⑤ 多值取任一命中区间
+    cpMin.value = '0.6'; cpMax.value = '1';
+    runBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 1 && /双值技能/.test(doc.getElementById('tblbox').textContent),
+      '「0.6~1」命中多值技能（0.67/0.5 取任一）', doc.getElementById('nHit').textContent);
+
+    // ⑥ 最小值 > 最大值 → 自动对调并提示
+    cpMin.value = '0.15'; cpMax.value = '0';
+    runBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(/自动对调/.test(doc.getElementById('tblbox').textContent), '最小值大于最大值时自动对调并提示');
+    ok(+doc.getElementById('nHit').textContent === 3, '对调后结果正确（0~0.15 → 3 个）',
+      doc.getElementById('nHit').textContent);
+
+    // ⑦ 表达式条含前摇条件
+    ok(/前摇/.test(doc.getElementById('expr').textContent), '「当前条件」表达式包含前摇区间',
+      doc.getElementById('expr').textContent.trim());
+
+    // ⑧ 只有前摇、没有 tag 也能检索
+    tagInp3.value = '';
+    tagInp3.dispatchEvent(new window.Event('input', { bubbles: true }));
+    cpMin.value = '0'; cpMax.value = '0';
+    runBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 2, '仅设前摇区间也可检索（无需 tag）',
+      doc.getElementById('nHit').textContent);
+
+    // ⑨ 前摇 + tag 同时生效：换一个不存在的 tag → 0 命中
+    tagInp3.value = '治疗';
+    tagInp3.dispatchEvent(new window.Event('input', { bubbles: true }));
+    cpMin.value = '0.15'; cpMax.value = '0.15';
+    runBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 1 && /零点一五/.test(doc.getElementById('tblbox').textContent),
+      '前摇与 tag 条件叠加生效', doc.getElementById('nHit').textContent);
+
+    // ⑩ 快捷按钮：≤0.15 填 0~0.15
+    doc.getElementById('cpLe015').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(cpMin.value === '0' && cpMax.value === '0.15', '快捷按钮「≤0.15」填入 0 ~ 0.15',
+      cpMin.value + '~' + cpMax.value);
+    // ⑪ 清空按钮同时清掉前摇输入
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(cpMin.value === '' && cpMax.value === '', '「清空」同时重置前摇区间');
+
+    // ⑫ 简洁模式仍可用（前摇筛选下）
+    tagInp3.value = '治疗';
+    tagInp3.dispatchEvent(new window.Event('input', { bubbles: true }));
+    cpMin.value = '0'; cpMax.value = '0.15';
+    runBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    doc.getElementById('btnView').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(doc.querySelectorAll('#tblbox .cmpgrid > .cmitem').length === 3, '前摇筛选下简洁模式照常渲染',
+      doc.querySelectorAll('#tblbox .cmpgrid > .cmitem').length);
+    doc.getElementById('btnView').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    // ⑬ 反选（非）+ 前摇叠加：结果必须是两者的交集，并给出反选排除数量
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+    const notGrp = doc.querySelector('.grp[data-k="not"]');
+    const addNot = (txt) => {
+      notGrp.querySelector('[data-add]').dispatchEvent(new window.Event('click', { bubbles: true }));
+      const ins = notGrp.querySelectorAll('.rows input');
+      const inp = ins[ins.length - 1];
+      inp.value = txt;
+      inp.dispatchEvent(new window.Event('input', { bubbles: true }));
+      return inp;
+    };
+    addNot('护盾');
+    cpMin.value = '0'; cpMax.value = '0.15';
+    runBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 2,
+      '反选「护盾」+ 前摇 0~0.15 → 2 个（3 个去 1 个）', doc.getElementById('nHit').textContent);
+    ok(!/零点一五/.test(doc.getElementById('tblbox').textContent) &&
+       /零前摇/.test(doc.getElementById('tblbox').textContent),
+      '被反选的技能不出现在结果里，其余保留');
+    ok(/反选/.test(doc.getElementById('tblbox').textContent), '结果区说明反选排除了多少条');
+    console.log('    反选说明：' + Array.prototype.map.call(doc.querySelectorAll('#tblbox .infobox'),
+      (e) => e.textContent.replace(/\s+/g, ' ').trim()).join(' ｜ '));
+
+    // 多个反选 tag：语义是「都要排除」，表达式显示为「非A 且 非B」
+    addNot('治疗');
+    runBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    const exprNot = doc.getElementById('expr').textContent.replace(/\s+/g, '');
+    ok(/非护盾且非治疗/.test(exprNot), '多个反选 tag 的表达式写作「非A 且 非B」', exprNot);
+    ok(+doc.getElementById('nHit').textContent === 0, '反选「护盾」+「治疗」→ 0 个（全部命中其一）',
+      doc.getElementById('nHit').textContent);
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    // ================= 英雄筛选（勾选英雄 = 只看这些英雄的技能） =================
+    const heroDb = {
+      fetchedAt: '2026-10-22T00:00:00.000Z',
+      tags: [{ id: 488, name: '治疗', c1: '机制', c2: '包含效果' }],
+      notePool: ['光环有0.1秒的粘滞时间。'],
+      heroes: [
+        { i: 10, zh: '甲英雄', en: 'alpha', a: '力量' },
+        { i: 11, zh: '乙英雄', en: 'beta', a: '敏捷' },
+        { i: 12, zh: '丙英雄', en: 'gamma', a: '智力' }
+      ],
+      abilities: [
+        { i: 9401, n: '甲一', en: 'alpha_one', d: [488], g: [], m: [], e: [], nt: [0], h: [10] },
+        { i: 9402, n: '甲二', en: 'alpha_two', d: [488], g: [], m: [], e: [], h: [10] },
+        { i: 9403, n: '乙一', en: 'beta_one', d: [488], g: [], m: [], e: [], h: [11], nt: [0] },
+        { i: 9404, n: '无归属', en: 'orphan', d: [488], g: [], m: [], e: [] }
+      ]
+    };
+    window.__tagsearch.applyDb(heroDb, '合成测试数据（英雄）');
+    mTag.dispatchEvent(new window.Event('click', { bubbles: true }));
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));  // 清掉上一组测试留下的前摇区间
+
+    const heroGrid = doc.getElementById('heroGrid');
+    const heroBody = doc.getElementById('heroBody');
+    ok(!!doc.getElementById('paneHero') && !!heroGrid, '左栏存在「英雄筛选」卡片');
+    ok(/名册 3/.test(doc.getElementById('mHero').textContent), '页头显示英雄名册数',
+      doc.getElementById('mHero').textContent);
+    ok(heroBody.style.display === 'none', '英雄名册默认收起（不占版面）');
+    doc.getElementById('heroToggle').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(heroBody.style.display !== 'none', '点「展开」后显示名册');
+    const chips = () => Array.prototype.slice.call(heroGrid.querySelectorAll('.hchip'));
+    ok(chips().length === 2, '只列出有技能记录的英雄（0 技能的「丙英雄」不出现）', chips().length);
+    ok(chips().every((c) => !!c.querySelector('.dot')), '每个英雄带主属性色点');
+    ok(/全部英雄（2）/.test(doc.getElementById('heroSum').textContent), '未勾选时摘要为「全部英雄」',
+      doc.getElementById('heroSum').textContent);
+
+    // 勾选「甲英雄」→ 只留该英雄的技能
+    const tagInp4 = doc.querySelector('.grp[data-k="and"] .rows input');
+    tagInp4.value = '治疗';
+    tagInp4.dispatchEvent(new window.Event('input', { bubbles: true }));
+    doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 4, '未勾选英雄时命中 4 条（全库）',
+      doc.getElementById('nHit').textContent);
+
+    const cbA = heroGrid.querySelector('.hchip input[value="10"]');
+    cbA.checked = true;
+    cbA.dispatchEvent(new window.Event('change', { bubbles: true }));
+    ok(heroGrid.querySelector('.hchip input[value="10"]').closest('.hchip').classList.contains('on'),
+      '勾选后 chip 高亮');
+    ok(+doc.getElementById('nHit').textContent === 2, '勾选英雄后立即按英雄重筛（甲英雄 2 条）',
+      doc.getElementById('nHit').textContent);
+    ok(/已按英雄筛选/.test(doc.getElementById('tblbox').textContent), '结果区提示按英雄筛选');
+    ok(!/乙一/.test(doc.getElementById('tblbox').textContent) && !/无归属/.test(doc.getElementById('tblbox').textContent),
+      '其他英雄与无归属条目被排除');
+    const hrCell = doc.querySelector('#tblbox tbody td.nm .hr');
+    ok(!!hrCell && /甲英雄/.test(hrCell.textContent), '结果表技能列下显示所属英雄', hrCell && hrCell.textContent);
+    ok(/英雄/.test(doc.getElementById('expr').textContent), '「当前条件」表达式包含英雄条件',
+      doc.getElementById('expr').textContent.trim());
+
+    // 详情弹窗含「所属英雄」
+    doc.querySelector('#tblbox tbody [data-detail]').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(/所属英雄/.test(doc.getElementById('mBody').textContent), '技能详情含「所属英雄」段');
+    doc.getElementById('mClose').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    // 清空 / 全选 / 反选
+    doc.getElementById('heroNone').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 4, '「清空」英雄勾选后恢复全库命中',
+      doc.getElementById('nHit').textContent);
+    doc.getElementById('heroAll').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 3, '「全选」= 甲乙两英雄的并集（3 条，无归属仍排除）',
+      doc.getElementById('nHit').textContent);
+    doc.getElementById('heroInv').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 4, '「反选」后全部取消 → 回到全库',
+      doc.getElementById('nHit').textContent);
+
+    // 搜索框过滤 + 只对可见项操作
+    const heroQ = doc.getElementById('heroQ');
+    heroQ.value = 'beta';
+    heroQ.dispatchEvent(new window.Event('input', { bubbles: true }));
+    ok(chips().length === 1 && /乙英雄/.test(chips()[0].textContent), '搜索框按中文/英文过滤英雄',
+      chips().map((c) => c.textContent.trim()).join('/'));
+    doc.getElementById('heroAll').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 1, '「全选」只作用于当前搜索到的英雄（乙英雄 1 条）',
+      doc.getElementById('nHit').textContent);
+    heroQ.value = '';
+    heroQ.dispatchEvent(new window.Event('input', { bubbles: true }));
+    ok(chips().length === 2, '清空搜索框后恢复完整名册');
+
+    // 与注释检索共用：注释模式同样受英雄筛选影响
+    mNote.dispatchEvent(new window.Event('click', { bubbles: true }));
+    const noteQ2 = doc.getElementById('noteQ');
+    noteQ2.value = '粘滞';
+    doc.getElementById('btnRunN').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 1 &&
+      /乙一/.test(doc.getElementById('tblbox').textContent), '注释检索同样按英雄筛选（只剩乙一）',
+      doc.getElementById('nHit').textContent);
+    ok(/已按英雄筛选/.test(doc.getElementById('tblbox').textContent), '注释模式同样提示按英雄筛选');
+    mTag.dispatchEvent(new window.Event('click', { bubbles: true }));
+    doc.getElementById('heroNone').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 4, '取消英雄勾选后 Tag 结果恢复',
+      doc.getElementById('nHit').textContent);
+
+    // 旧快照（无 heroes）→ 名册给出提示
+    window.__tagsearch.applyDb({
+      fetchedAt: '', tags: heroDb.tags,
+      abilities: [{ i: 9501, n: '无英雄技能', en: 'x', d: [488], g: [], m: [], e: [] }]
+    }, '旧快照');
+    ok(/不含英雄名册/.test(heroGrid.textContent), '数据无英雄名册时给出重新抓取提示',
+      heroGrid.textContent.trim().slice(0, 24));
+    ok(doc.getElementById('mHero').textContent === '无', '页头英雄数显示「无」', doc.getElementById('mHero').textContent);
 
     console.log(fails ? `\n${fails} 项失败` : '\n全部通过');
     process.exit(fails ? 1 : 0);

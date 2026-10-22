@@ -11,6 +11,14 @@
    先由 HTML 转成「纯文本行 + 缩进层级」，再按行去重成全局行池 notePool，
    技能侧 nt = 行池下标数组、ni = 与 nt 等长的缩进数组（全 0 时省略）。
    这样同一句话（如「光环有0.1秒的粘滞时间。」）在全库只存一份。
+
+3) 英雄目录（抓取时 heroes = 内容管理-英雄数据全量，含 ability_map）
+   输出 heroes = [{i,zh,en,a}]；技能侧 h = 所属英雄 id 数组。
+   归属**只**取 ability_map —— 即英雄数据页「人工处理数据 → 技能」里那串现版本技能。
+   一个技能可属多个英雄（如共享天赋/共享子技能）。
+   ⚠️ 不做英文名推断：技能总表里残留大量旧版本技能（米波 meepo_geostrike 地之突袭、
+   幽鬼 spectre_haunt_single 如影随形、meepo_pack_rat 囤积狂鼠等）与废弃天赋，
+   前缀也属于某英雄，推断会把旧技能混进筛选结果。未登记者 h 留空（= 非现版本英雄技能）。
 """
 import json
 import os
@@ -126,13 +134,58 @@ def note_slot(text):
     return i
 
 
+# ---------------------------------------------------------------- 英雄 → 技能映射
+heroes_raw = d.get('heroes') or []
+HERO_ATTR_ORDER = ['力量', '敏捷', '智力', '全才']
+heroes_out = []
+skill_hero = {}          # 技能 id -> [英雄 id…]（按英雄在名册中的顺序）
+for h in heroes_raw:
+    try:
+        hid = int(h.get('i') or 0)
+    except (TypeError, ValueError):
+        hid = 0
+    if hid <= 0:
+        continue
+    try:
+        attr = str(h.get('a') or '')
+    except (TypeError, ValueError):
+        attr = ''
+    heroes_out.append({'i': hid, 'zh': h.get('zh') or '', 'en': h.get('en') or '', 'a': attr})
+    for sid in h.get('s') or []:
+        try:
+            sid = int(sid)
+        except (TypeError, ValueError):
+            continue
+        if sid <= 0:
+            continue
+        arr = skill_hero.setdefault(sid, [])
+        if hid not in arr:
+            arr.append(hid)
+
+
+# ⚠️ 只认 ability_map（英雄数据页「人工处理数据 → 技能」里那串现版本技能）。
+# 技能总表(/apg/admin/hero/ability)里残留大量旧版本技能与废弃天赋，
+# 它们的英文名前缀同样属于某英雄，**不能**拿来推断归属，否则旧技能会混进筛选结果。
+
+# ---------------------------------------------------------------- 技能主表
 abilities = []
 feat_skills = 0
 note_skills = 0
 note_line_refs = 0
+cast_skills = 0
+map_by_field = 0
+map_none = 0
 
 for a in d['abilities']:
     b = {k: a.get(k, []) for k in ('i', 'n', 'en', 'd', 'g', 'm', 'e')}
+
+    # 所属英雄：仅取 ability_map（未被任何英雄登记 = 旧版本/废弃/通用条目）
+    hs = skill_hero.get(a.get('i'))
+    if hs:
+        map_by_field += 1
+        b['h'] = hs
+    else:
+        map_none += 1
 
     raw = a.get('f') or []
     fidx = []
@@ -164,6 +217,12 @@ for a in d['abilities']:
         note_skills += 1
         note_line_refs += len(lines)
 
+    # 施法前摇（原样保留文本：可能为空、带备注如「0（魔晶）」、或「0.2/0.3」多值）
+    cp = str(a.get('cp') or '').strip()
+    if cp:
+        b['cp'] = cp
+        cast_skills += 1
+
     abilities.append(b)
 
 out = {
@@ -172,6 +231,7 @@ out = {
     'featText': feat_text,
     'notePool': note_pool,
     'abilities': abilities,
+    'heroes': heroes_out,
 }
 
 with open(DST, 'w', encoding='utf-8') as f:
@@ -181,6 +241,12 @@ with open(DST, 'w', encoding='utf-8') as f:
 
 feat_items = sum(len(v) for v in feat_text.values())
 print('data.js 已生成：tags=%d abilities=%d 特性tag=%d 池槽=%d 引用=%d 带内容技能=%d '
-      '注释行池=%d 注释引用=%d 带注释技能=%d size=%.0f KB'
+      '注释行池=%d 注释引用=%d 带注释技能=%d 带前摇技能=%d size=%.0f KB'
       % (len(out['tags']), len(out['abilities']), len(feat_text), feat_items, refs[0], feat_skills,
-         len(note_pool), note_line_refs, note_skills, os.path.getsize(DST) / 1024.0))
+         len(note_pool), note_line_refs, note_skills, cast_skills, os.path.getsize(DST) / 1024.0))
+print('英雄：%d 个（力量 %d / 敏捷 %d / 智力 %d / 全才 %d / 其他 %d）；技能归属（仅 ability_map）：有归属 %d / 无归属 %d'
+      % (len(heroes_out),
+         sum(1 for h in heroes_out if h['a'] == '力量'), sum(1 for h in heroes_out if h['a'] == '敏捷'),
+         sum(1 for h in heroes_out if h['a'] == '智力'), sum(1 for h in heroes_out if h['a'] == '全才'),
+         sum(1 for h in heroes_out if h['a'] not in HERO_ATTR_ORDER),
+         map_by_field, map_none))

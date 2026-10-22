@@ -10,6 +10,14 @@
  *   not: [tagName…] 全部不得包含（反选/排除）
  *   scope: {d:技能类型, e:技能效果, m:技能特性, g:tags字段}
  *   includeExcluded: 是否把「废弃/自定义/公式残条」条目也纳入检索（默认 false，即排除）
+ *   cast: {min, max} 施法前摇闭区间（秒，null=该侧不限）——与 tag 条件**同时生效**，
+ *         数据来自后台 ability_cast_point（注意 _back 后缀的是「施法后摇」）；
+ *         无前摇数据的技能在启用该条件时不参与命中（统计在 stats.cast.missing）。
+ *   heroes: [英雄 id…] 英雄筛选（来自「内容管理-英雄数据」全量名册）——勾选后只保留
+ *         这些英雄的**现版本技能**（并集）；不勾选 = 全部。技能的所属英雄见 a.h，
+ *         构建阶段**只取**该英雄的 ability_map（即英雄数据页「人工处理数据 → 技能」列表），
+ *         不做英文名推断；技能总表里残留的旧版本技能/废弃天赋登记不到任何英雄，
+ *         启用英雄筛选时不会被命中（统计在 stats.hero.out）。
  * 同名 tag 可能存在于多个档位（如「友方防御塔」有 目标/神杖/魔晶/天赋 四档）→ 命中任一档即算包含。
  * 技能特性（skill_mechanism）除词条外还有「特性内容」（mechanism_input）：
  *   数据侧池化为 featText = {tagId:[文本…]}，技能侧 f = 与 m 同序的池下标，
@@ -60,6 +68,24 @@
     var excludedBy = { noUse: 0, custom: 0, junk: 0 };
     abilities.forEach(function (a) { var k = excludeKind(a); if (k) excludedBy[k]++; });
     var excludedTotal = excludedBy.noUse + excludedBy.custom + excludedBy.junk;
+
+    /* 英雄名册（内容管理-英雄数据）：heroes = [{i,zh,en,a}]，技能侧 a.h = 所属英雄 id 数组 */
+    var heroes = db.heroes || [];
+    var id2hero = new Map();
+    heroes.forEach(function (h) { if (h && h.i != null) id2hero.set(h.i, h); });
+    var heroSkills = new Map();      // 英雄 id → 归属技能条数（含被排除项）
+    var heroSkillsValid = new Map();  // 英雄 id → 归属技能条数（不含被排除项）
+    var heroedSkills = 0;            // 有英雄归属的技能条数
+    var unexplainedSkills = 0;       // 无任何英雄归属的技能条数
+    abilities.forEach(function (a) {
+      var hs = a.h || [];
+      var bad = excludeKind(a) ? 1 : 0;
+      if (hs.length) heroedSkills++; else unexplainedSkills++;
+      hs.forEach(function (id) {
+        heroSkills.set(id, (heroSkills.get(id) || 0) + 1);
+        if (!bad) heroSkillsValid.set(id, (heroSkillsValid.get(id) || 0) + 1);
+      });
+    });
     return {
       db: db,
       id2tag: id2tag,
@@ -68,10 +94,25 @@
       abilities: abilities,
       featText: db.featText || {},
       notePool: db.notePool || [],
+      heroes: heroes,
+      id2hero: id2hero,
+      heroSkills: heroSkills,
+      heroSkillsValid: heroSkillsValid,
+      heroedSkills: heroedSkills,
+      unexplainedSkills: unexplainedSkills,
       excludedBy: excludedBy,
       excludedTotal: excludedTotal,
       fetchedAt: db.fetchedAt || ''
     };
+  }
+
+  /** 某技能的所属英雄：[{id, zh, en, a}]（无归属为空数组） */
+  function heroesOf(index, a) {
+    var map = (index && index.id2hero) || new Map();
+    return ((a && a.h) || []).map(function (id) {
+      var h = map.get(id);
+      return { id: id, zh: h ? h.zh : '未知英雄 ' + id, en: h ? h.en : '', a: h ? h.a : '' };
+    });
   }
 
   /** 某技能的特性内容数组（与 a.m 同序；无内容为空字符串） */
@@ -130,9 +171,10 @@
   }
 
   /** 注释检索（与 tag 检索完全独立）
-   * query = {q:'查找内容', includeExcluded:bool}
+   * query = {q:'查找内容', heroes:[英雄 id…], includeExcluded:bool}
    *   多个词用空白分隔 → 需全部出现（AND），英文不区分大小写。
-   * 命中项：{id,name,en,ability,upgrades,excluded,lines[{n,t,ind,hit}],matched,count,noteCount}
+   *   heroes 非空时只在该批英雄的技能里查（并集）。
+   * 命中项：{id,name,en,heroes,ability,upgrades,excluded,lines[{n,t,ind,hit}],matched,count,noteCount}
    * 排序：命中行数 ↓ → 词频 ↓ → id ↓ */
   function searchNotes(index, query) {
     query = query || {};
@@ -140,6 +182,10 @@
       .map(function (s) { return s.trim(); }).filter(Boolean);
     var lows = terms.map(function (s) { return s.toLowerCase(); });
     var showExcluded = !!query.includeExcluded;
+    var heroIds = normHeroIds(query.heroes);
+    var heroOn = heroIds.length > 0;
+    var heroSet = new Set(heroIds);
+    var heroOut = 0;
     var hits = [];
     var skipped = 0;
     var base = {
@@ -153,7 +199,8 @@
         skipped: 0,
         effective: index.abilities.length - (index.excludedTotal || 0),
         includeExcluded: showExcluded,
-        noteSkills: noteStats(index).skills
+        noteSkills: noteStats(index).skills,
+        hero: heroStats(index, heroOn, heroIds, 0)
       }
     };
     if (!lows.length) return base;
@@ -161,6 +208,7 @@
     index.abilities.forEach(function (a) {
       var ex = excludeKind(a);
       if (ex && !showExcluded) { skipped++; return; }
+      if (heroOn && !hasHero(a, heroSet)) { heroOut++; return; }
       var lines = noteLines(index, a);
       if (!lines.length) return;
       var full = lines.map(function (l) { return l.t; }).join('\n').toLowerCase();
@@ -180,7 +228,7 @@
         return { n: l.n, t: l.t, ind: l.ind, hit: hit };
       });
       hits.push({
-        id: a.i, name: a.n, en: a.en, ability: a, upgrades: upgrades(a),
+        id: a.i, name: a.n, en: a.en, heroes: heroesOf(index, a), ability: a, upgrades: upgrades(a),
         excluded: ex || null, lines: ls, matched: matched, count: count, noteCount: ls.length
       });
     });
@@ -189,7 +237,40 @@
       return (y.matched - x.matched) || (y.count - x.count) || (y.id - x.id);
     });
     base.stats.skipped = skipped;
+    base.stats.hero = heroStats(index, heroOn, heroIds, heroOut);
     return base;
+  }
+
+  /* ---------- 英雄筛选 ---------- */
+  /** 归一化英雄 id 数组（去空、去重） */
+  function normHeroIds(list) {
+    var out = [];
+    (list || []).forEach(function (v) {
+      var n = parseInt(v, 10);
+      if (!isNaN(n) && n > 0 && out.indexOf(n) < 0) out.push(n);
+    });
+    return out;
+  }
+
+  /** 该技能是否属于所选英雄之一 */
+  function hasHero(a, heroSet) {
+    var hs = (a && a.h) || [];
+    for (var i = 0; i < hs.length; i++) { if (heroSet.has(hs[i])) return true; }
+    return false;
+  }
+
+  /** 所选英雄名下的技能条数（含被排除项；未启用为 0） */
+  function heroPoolSize(index, heroSet) {
+    if (!heroSet || !heroSet.size) return 0;
+    var n = 0;
+    (index.abilities || []).forEach(function (a) { if (hasHero(a, heroSet)) n++; });
+    return n;
+  }
+
+  /** 统一构造 stats.hero */
+  function heroStats(index, on, ids, out) {
+    var set = new Set(ids || []);
+    return { on: !!on, ids: (ids || []).slice(), out: out || 0, pool: heroPoolSize(index, set) };
   }
 
   function normalizeScope(scope) {
@@ -288,6 +369,44 @@
     return UPGRADE_ORDER.filter(function (id) { return s.has(id); });
   }
 
+  /** 施法前摇（ability_cast_point）解析成数值数组
+   *  '0.2' → [0.2]；'0（魔晶）' → [0]；'0.2/0.3' → [0.2,0.3]；空 → [] */
+  var CP_CACHE = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  function castPoints(a) {
+    if (!a) return [];
+    if (CP_CACHE && CP_CACHE.has(a)) return CP_CACHE.get(a);
+    var raw = String(a.cp == null ? '' : a.cp);
+    var out = [];
+    var re = /\d+(?:\.\d+)?/g, m;
+    while ((m = re.exec(raw))) {
+      var v = parseFloat(m[0]);
+      if (!isNaN(v)) out.push(v);
+    }
+    if (CP_CACHE) CP_CACHE.set(a, out);
+    return out;
+  }
+
+  /** 是否落在前摇闭区间内：任取一值命中即算；无数据 → false
+   *  min/max 为 null 表示该侧不限 */
+  function castInRange(a, min, max) {
+    var v = castPoints(a);
+    if (!v.length) return false;
+    var lo = (min == null || isNaN(min)) ? -Infinity : Number(min);
+    var hi = (max == null || isNaN(max)) ? Infinity : Number(max);
+    for (var i = 0; i < v.length; i++) {
+      if (v[i] >= lo && v[i] <= hi) return true;
+    }
+    return false;
+  }
+
+  /** 前摇条件是否被启用（两侧都空 = 不过滤） */
+  function castActive(cast) {
+    if (!cast) return false;
+    var hasMin = cast.min != null && cast.min !== '' && !isNaN(cast.min);
+    var hasMax = cast.max != null && cast.max !== '' && !isNaN(cast.max);
+    return hasMin || hasMax;
+  }
+
   function search(index, query) {
     var scope = normalizeScope(query.scope);
     var fuzzy = !!query.fuzzy;
@@ -312,9 +431,25 @@
     var showExcluded = !!query.includeExcluded;
     var skipped = 0;
 
+    // 施法前摇区间（可选，与 tag 条件同时生效）
+    var cast = query.cast || null;
+    var castOn = castActive(cast);
+    var castMin = castOn && cast.min != null && cast.min !== '' && !isNaN(cast.min) ? Number(cast.min) : null;
+    var castMax = castOn && cast.max != null && cast.max !== '' && !isNaN(cast.max) ? Number(cast.max) : null;
+    var castMissing = 0, castOut = 0;
+
+    // 英雄筛选（可选，与 tag / 前摇条件同时生效）
+    var heroIds = normHeroIds(query.heroes);
+    var heroOn = heroIds.length > 0;
+    var heroSet = new Set(heroIds);
+    var heroOut = 0;
+    var notOut = 0;          // 被「反选」条件排除的技能条数（供界面说明「剩下」的算式）
+    var afterTag = 0;        // 通过全部 tag 条件（含反选）、进入前摇判定的条数
+
     index.abilities.forEach(function (a) {
       var ex = excludeKind(a);
       if (ex && !showExcluded) { skipped++; return; }
+      if (heroOn && !hasHero(a, heroSet)) { heroOut++; return; }
       var set = tagSet(a, scope);
       var i;
       for (i = 0; i < andIds.length; i++) {
@@ -328,7 +463,13 @@
         if (!okOr) return;
       }
       for (i = 0; i < notIds.length; i++) {
-        if (notIds[i] && hasId(set, notIds[i])) return;
+        if (notIds[i] && hasId(set, notIds[i])) { notOut++; return; }
+      }
+      // 前摇区间（在 tag 条件之后应用，便于统计「因前摇被排除」的数量）
+      afterTag++;
+      if (castOn) {
+        if (!castPoints(a).length) { castMissing++; return; }
+        if (!castInRange(a, castMin, castMax)) { castOut++; return; }
       }
       var detail = [];
       rAnd.forEach(function (r, k) {
@@ -346,8 +487,9 @@
         return hitIds.indexOf(f.id) >= 0 && f.text;
       });
       hits.push({
-        id: a.i, name: a.n, en: a.en, tagCount: set.size, detail: detail, feats: feats,
-        ability: a, upgrades: upgrades(a), excluded: ex || null
+        id: a.i, name: a.n, en: a.en, heroes: heroesOf(index, a), tagCount: set.size, detail: detail, feats: feats,
+        ability: a, upgrades: upgrades(a), excluded: ex || null,
+        cast: String(a.cp == null ? '' : a.cp), castVals: castPoints(a)
       });
     });
 
@@ -363,7 +505,10 @@
         excludedBy: index.excludedBy || { noUse: 0, custom: 0, junk: 0 },
         skipped: skipped,
         effective: index.abilities.length - (index.excludedTotal || 0),
-        includeExcluded: showExcluded
+        includeExcluded: showExcluded,
+        cast: { on: castOn, min: castMin, max: castMax, missing: castMissing, out: castOut },
+        not: { on: notIds.length > 0, out: notOut, afterTag: afterTag, names: rNot.map(function (r) { return r && r.input || ''; }) },
+        hero: heroStats(index, heroOn, heroIds, heroOut)
       }
     };
   }
@@ -373,7 +518,7 @@
     scope = normalizeScope(scope);
     var nm = function (id) { var t = index.id2tag.get(id); return t ? { id: id, name: t.name, c1: t.c1, c2: t.c2 } : { id: id, name: '未知 tag ' + id, c1: '', c2: '' }; };
     var uniq = function (ids) { var seen = {}; return (ids || []).filter(function (id) { if (seen[id]) return false; seen[id] = 1; return true; }).map(nm); };
-    var out = { detail: [], mech: [], tags: [], effects: [], upgrades: upgrades(a) };
+    var out = { detail: [], mech: [], tags: [], effects: [], upgrades: upgrades(a), cast: String(a.cp == null ? '' : a.cp) };
     if (scope.d) out.detail = uniq(a.d);
     if (scope.m) {
       var seenM = {};
@@ -399,7 +544,13 @@
     describe: describe,
     resolveName: resolveName,
     upgrades: upgrades,
+    castPoints: castPoints,
+    castInRange: castInRange,
+    castActive: castActive,
     excludeKind: excludeKind,
+    heroesOf: heroesOf,
+    normHeroIds: normHeroIds,
+    hasHero: hasHero,
     featsOf: featsOf,
     featTexts: featTexts,
     EXCLUDE_KINDS: EXCLUDE_KINDS,

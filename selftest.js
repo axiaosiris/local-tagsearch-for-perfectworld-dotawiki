@@ -78,3 +78,103 @@ if (!ns.skills) {
   var multi = core.searchNotes(idx, { q: '粘滞 光环' });
   console.log('  「粘滞 光环」(AND) → ' + multi.hits.length + ' 个技能');
 }
+
+// ================= 施法前摇筛选（可与 tag 条件同时生效） =================
+console.log('\n[施法前摇] 区间关区间判定：');
+var castCount = idx.abilities.filter(function (a) { return core.castPoints(a).length; }).length;
+console.log('  data.js 中带前摇数据的技能：' + castCount + ' / ' + idx.abilities.length);
+if (!castCount) {
+  var sc = core.createIndex({
+    tags: [{ id: 1, name: '合成tag', c1: '机制', c2: '包含效果' }],
+    abilities: [
+      { i: 1, n: '零', en: 'z', d: [1], g: [], m: [], e: [], cp: '0' },
+      { i: 2, n: '零点二', en: 'a', d: [1], g: [], m: [], e: [], cp: '0.2' },
+      { i: 3, n: '无数据', en: 'n', d: [1], g: [], m: [], e: [] }
+    ]
+  });
+  var s0 = core.search(sc, { and: ['合成tag'], or: [], not: [], scope: { d: 1 }, cast: { min: 0, max: 0 } });
+  console.log('  合成 0~0 → ' + s0.hits.length + ' 条（期望 1）');
+} else {
+  [[0, 0], [0, 0.15], [null, 0.15]].forEach(function (r) {
+    var rr = core.search(idx, { and: [], or: [], not: [], scope: { d: 1, e: 1, m: 1, g: 1 }, cast: { min: r[0], max: r[1] } });
+    console.log('  前摇 ' + (r[0] == null ? '≤' : r[0] + '~') + (r[0] == null ? r[1] : r[1]) +
+      ' → ' + rr.hits.length + ' 条（无数据被排除 ' + rr.stats.cast.missing + '，不在区间 ' + rr.stats.cast.out + '）');
+    rr.hits.slice(0, 3).forEach(function (h) {
+      console.log('    · ' + h.id + ' ' + h.name + '  前摇=' + h.cast);
+    });
+  });
+  // 与 tag 叠加
+  var withTag = core.search(idx, { and: ['防御塔'], or: [], not: [], scope: { d: 1, e: 1, m: 1, g: 1 }, cast: { min: 0, max: 0.15 } });
+  console.log('  且:防御塔 + 前摇 0~0.15 → ' + withTag.hits.length + ' 条');
+  withTag.hits.forEach(function (h) { console.log('    · ' + h.id + ' ' + h.name + '  前摇=' + (h.cast || '(无)')); });
+
+  // 反选 + 前摇：结果是两者交集（前摇全量 = 反选后剩余 + 反选排除数）
+  var q0 = { and: [], or: [], not: [], scope: { d: 1, e: 1, m: 1, g: 1 }, cast: { min: 0, max: 0 } };
+  var castAll = core.search(idx, q0);
+  var castNot = core.search(idx, {
+    and: [], or: [], not: ['防御塔'], scope: { d: 1, e: 1, m: 1, g: 1 }, cast: { min: 0, max: 0 }
+  });
+  var nt = castNot.stats.not || {};
+  var cst = castNot.stats.cast || {};
+  var chain = (nt.afterTag - cst.missing - cst.out) === castNot.hits.length;
+  console.log('  前摇0~0 全量 ' + castAll.hits.length + ' 条；叠加反选后：有效 ' +
+    castNot.stats.effective + ' − 反选排除 ' + nt.out + ' = 参加前摇判定 ' + nt.afterTag +
+    ' − 无前摇 ' + cst.missing + ' − 区间外 ' + cst.out + ' = ' + castNot.hits.length +
+    '（' + (chain && castNot.hits.length === 216 ? '✓ 与独立核算的 216 一致' : '✗ 与期望 216 不一致') + '）');
+  console.log('  反选条件 = ' + JSON.stringify(nt.names) + '，反选后 ' + castNot.hits.length + ' 条');
+}
+
+// ================= 英雄筛选（名册来自后台「内容管理-英雄数据」） =================
+console.log('\n[英雄筛选]');
+var heroTotal = (idx.heroes || []).length;
+console.log('  名册英雄 = ' + heroTotal + '，有归属技能 = ' + idx.heroedSkills + '，无归属 = ' + idx.unexplainedSkills);
+if (!heroTotal) {
+  console.log('  当前 data.js 不含英雄名册 —— 用合成数据自检');
+  var sh = core.createIndex({
+    tags: [{ id: 1, name: '合成tag', c1: '机制', c2: '包含效果' }],
+    heroes: [{ i: 10, zh: '甲', en: 'alpha', a: '力量' }, { i: 11, zh: '乙', en: 'beta', a: '敏捷' }],
+    abilities: [
+      { i: 1, n: '甲的技能', en: 'alpha_q', d: [1], g: [], m: [], e: [], h: [10] },
+      { i: 2, n: '乙的技能', en: 'beta_q', d: [1], g: [], m: [], e: [], h: [11] },
+      { i: 3, n: '无归属', en: 'generic', d: [1], g: [], m: [], e: [] }
+    ]
+  });
+  var q1 = core.search(sh, { and: ['合成tag'], hero: undefined, heroes: [10] });
+  console.log('  合成 且:合成tag + 英雄甲 → ' + q1.hits.length + ' 条（期望 1）');
+} else {
+  var byEn = {};
+  idx.heroes.forEach(function (h) { byEn[String(h.en).toLowerCase()] = h; });
+  var am = byEn['antimage'];
+  console.log('  敌法师 = id ' + am.i + '，名下技能 ' + (idx.heroSkills.get(am.i) || 0) + ' 条');
+  var r1 = core.search(idx, { and: [], or: [], not: [], scope: { d: 1, e: 1, m: 1, g: 1 }, heroes: [am.i] });
+  var allMine = r1.hits.every(function (h) { return h.heroes.some(function (x) { return x.id === am.i; }); });
+  console.log('  仅英雄:敌法师 → ' + r1.hits.length + ' 条（全部归属敌法师: ' + allMine + '）' +
+    '，stats.hero.pool=' + r1.stats.hero.pool + '，out=' + r1.stats.hero.out);
+  r1.hits.slice(0, 5).forEach(function (h) {
+    console.log('    · ' + h.id + ' ' + h.name + '  [' + h.heroes.map(function (x) { return x.zh; }).join('、') + ']');
+  });
+  var ax = byEn['axe'];
+  var r2 = core.search(idx, { and: [], or: [], not: [], scope: { d: 1, e: 1, m: 1, g: 1 }, heroes: [am.i, ax.i] });
+  console.log('  仅英雄:敌法师+斧王 → ' + r2.hits.length + ' 条（= ' + r1.hits.length + ' + ' + (idx.heroSkills.get(ax.i) || 0) + '，去重后）');
+  // 与 tag 叠加
+  var r3 = core.search(idx, { and: ['防御塔'], or: [], not: [], scope: { d: 1, e: 1, m: 1, g: 1 }, heroes: [am.i] });
+  console.log('  且:防御塔 + 英雄敌法师 → ' + r3.hits.length + ' 条');
+  // 注释检索同样支持
+  var r4 = core.searchNotes(idx, { q: '粘滞', heroes: [am.i] });
+  var r4all = core.searchNotes(idx, { q: '粘滞' });
+  console.log('  注释「粘滞」全库 ' + r4all.hits.length + ' → 限敌法师 ' + r4.hits.length + ' 条；' +
+    '限敌法师+斧王 ' + core.searchNotes(idx, { q: '粘滞', heroes: [am.i, ax.i] }).hits.length + ' 条');
+  console.log('  注释 stats.hero = ' + JSON.stringify(r4.stats.hero));
+
+  // 旧版本技能回归：这些条目仍留在技能总表里，但「人工处理数据」没登记 → 不得归属任何英雄
+  var byId = {};
+  idx.abilities.forEach(function (a) { byId[a.i] = a; });
+  [[7851, '如影随形(旧)'], [5432, '地之突袭'], [1355, '囤积狂鼠'], [5005, '法术护盾']].forEach(function (p) {
+    var a = byId[p[0]];
+    if (!a) { console.log('  旧版本回归 ' + p[0] + ' ' + p[1] + ' → 数据中已无此条目'); return; }
+    var hs = core.heroesOf(idx, a) || [];
+    console.log('  旧版本回归 ' + p[0] + ' ' + (a.n || p[1]) + ' → 归属 ' +
+      (hs.length ? hs.map(function (x) { return x.zh; }).join('/') : '（无）') +
+      (hs.length ? '  ✗ 应无归属' : '  ✓'));
+  });
+}

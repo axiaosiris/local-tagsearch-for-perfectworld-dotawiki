@@ -30,6 +30,17 @@ header .meta b{color:#374151;font-weight:600}
 .scope{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:12px;font-size:13px;color:#333}
 .scope label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
 .scope .ttl{width:100%;font-size:12px;color:var(--sub);margin-bottom:2px}
+.cpbox{border:1px solid var(--line);border-radius:9px;padding:10px 11px;margin-bottom:10px;background:#fcfdff;border-left:3px solid #7c8fa6}
+.cpbox .ttl{font-weight:650;font-size:13px;color:#5d6f85;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.cpbox .ttl .hint{font-weight:400;font-size:11.5px;color:var(--sub)}
+.cprow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cprow input[type=number]{width:76px;padding:5px 7px;border:1px solid #d5dbe3;border-radius:6px;font-size:13px;
+  font-family:inherit;color:var(--text);background:#fff;outline:none}
+.cprow input[type=number]:focus{border-color:var(--pri);box-shadow:0 0 0 2px rgba(45,120,220,.12)}
+.cprow input[type=number]::-webkit-outer-spin-button,.cprow input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.cprow .sep{color:#8b97a6;font-size:13px}
+.cprow .unit{color:var(--sub);font-size:12px}
+.cprow .btn.link{font-size:12px;padding:2px 5px}
 .grp{border:1px solid var(--line);border-radius:9px;padding:10px 11px;margin-bottom:10px;background:#fcfdff}
 .grp.and{border-left:3px solid var(--and)}
 .grp.or{border-left:3px solid var(--or)}
@@ -50,7 +61,7 @@ header .meta b{color:#374151;font-weight:600}
 .resol.bad{color:var(--warn)}
 .resol em{font-style:normal;color:#374151;font-weight:600}
 .btn{border:1px solid var(--line);background:#fff;color:#33345a;padding:5px 11px;border-radius:7px;
-  font:12.5px inherit;cursor:pointer}
+  font:12.5px inherit;cursor:pointer;white-space:nowrap}
 .btn:hover{background:#f7f9fc;border-color:#cfd6e0}
 .btn.link{border:0;background:transparent;color:var(--pri);padding:4px 6px}
 .btn.link:hover{text-decoration:underline;background:transparent}
@@ -70,11 +81,15 @@ header .meta b{color:#374151;font-weight:600}
 .sum .sp{flex:1}
 .tblbox{max-height:calc(100vh - 190px);overflow:auto}
 table{border-collapse:collapse;width:100%;font-size:13px}
+/* Tag 结果表列较多（升级项/技能/ID/施法前摇/命中详情/tag 数/详情）：
+   窄窗口下保底宽度 + 容器横向滚动，避免末列「详情」被挤成竖排 */
+.tblbox table.tagTbl{min-width:900px}
 th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line2);vertical-align:top}
 thead th{position:sticky;top:0;background:#fbfcfe;z-index:2;font-weight:600;font-size:12.5px;color:#4a5568;
   border-bottom:1px solid var(--line)}
 tbody tr:hover{background:#fafcff}
 td.id{color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.cpcell{font-variant-numeric:tabular-nums;white-space:nowrap;color:#3f4b5a;font-size:12.5px}
 td.nm{font-weight:600;white-space:nowrap}
 td.en{color:#9aa4b2;font-size:11.5px;word-break:break-all}
 .chip{display:inline-block;background:var(--chip);border:1px solid var(--chipb);border-radius:6px;
@@ -118,6 +133,8 @@ tr.ex td.nm{font-style:italic}
 .expr .p{display:inline-block;padding:0 5px;border-radius:4px;font-weight:700;font-size:11px;
   margin-right:4px;color:#fff;vertical-align:1px}
 .expr .p.and{background:var(--and)} .expr .p.or{background:var(--or)} .expr .p.not{background:var(--not)}
+.expr .p.cp{background:#7c8fa6}
+.expr .p.hp{background:#8e7cc3}
 .expr .join{font-weight:700;color:var(--sub);margin:0 5px}
 .expr code{background:#fff;border:1px solid var(--line);border-radius:4px;padding:0 4px;
   font:11.5px/1.6 ui-monospace,Consolas,Menlo,monospace}
@@ -195,6 +212,26 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
 .tblbox table.noteTbl{min-width:700px;table-layout:fixed}
 .nline{word-break:break-word}
 .noteTbl td:last-child{white-space:nowrap;padding-left:4px;padding-right:6px}
+/* 英雄筛选 */
+.hdright{display:flex;align-items:center;gap:8px}
+.hdright .tip{margin:0}
+.herorow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.herorow input{flex:1;min-width:110px;padding:5px 8px;font:13px/1.4 inherit;color:var(--text);
+  border:1px solid var(--line);border-radius:7px;background:#fff;outline:none}
+.herorow input:focus{border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-bg)}
+.herorow .btn.link{font-size:12px;padding:2px 5px}
+.herogrid{display:flex;flex-wrap:wrap;gap:5px;max-height:236px;overflow:auto;padding:8px 7px;
+  border:1px solid var(--line);border-radius:8px;background:#fdfefe;margin:8px 0}
+.hchip{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;line-height:1.6;
+  padding:1px 7px 1px 5px;border:1px solid var(--line);border-radius:6px;cursor:pointer;
+  background:#fbfcfe;user-select:none;white-space:nowrap}
+.hchip:hover{border-color:#cfd6e0;background:#f6f9fe}
+.hchip.on{background:var(--pri-bg);border-color:#bcd3fb;color:#1f57c9;font-weight:600}
+.hchip input{margin:0;width:13px;height:13px;flex:none;cursor:pointer}
+.hchip .dot{width:6px;height:6px;border-radius:50%;flex:none}
+.dot.a-str{background:#c0392b}.dot.a-agi{background:#1f9d55}.dot.a-int{background:#2f80ed}.dot.a-uni{background:#8e7cc3}
+td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
+.heroEmpty{padding:10px;text-align:center;color:var(--sub);font-size:12px;width:100%}
 </style>
 </head>
 <body>
@@ -205,12 +242,36 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
     <button class="mbtn on" data-mode="tag" title="按 tag（标签）检索技能">Tag 检索</button>
     <button class="mbtn" data-mode="note" title="在技能注释里查找文字">注释检索</button>
   </div>
-  <div class="meta">数据快照 <b id="mTime">—</b> ｜ Tag <b id="mTags">—</b> 条 ｜ 技能 <b id="mAbs">—</b> 条 ｜ 注释 <b id="mNotes">—</b> 条</div>
+  <div class="meta">数据快照 <b id="mTime">—</b> ｜ Tag <b id="mTags">—</b> 条 ｜ 技能 <b id="mAbs">—</b> 条 ｜ 英雄 <b id="mHero">—</b> 个 ｜ 注释 <b id="mNotes">—</b> 条</div>
   <div class="hdact"><button class="btn" id="btnUpdate" title="从 partner 后台抓取最新数据">⟳ 更新本地数据</button></div>
 </header>
 
 <div class="wrap">
   <aside class="side">
+    <div class="card" id="paneHero">
+      <div class="hd"><h2>英雄筛选</h2>
+        <div class="hdright">
+          <span class="tip" id="heroSum" style="margin:0">全部英雄</span>
+          <button class="btn link" id="heroToggle">展开</button>
+        </div>
+      </div>
+      <div class="bd" id="heroBody" style="display:none">
+        <div class="herorow">
+          <input id="heroQ" placeholder="搜索英雄（中文 / 英文）" spellcheck="false">
+          <button class="btn link" id="heroAll" title="勾选当前搜索到的英雄">全选</button>
+          <button class="btn link" id="heroNone" title="清空全部勾选 = 不按英雄筛选">清空</button>
+          <button class="btn link" id="heroInv" title="反选当前搜索到的英雄">反选</button>
+        </div>
+        <div class="herogrid" id="heroGrid"></div>
+        <div class="tip" style="margin:0">
+          勾选后<b>只检索这些英雄的现版本技能</b>（多选=并集），可与 tag / 施法前摇条件同时生效；
+          <b>不勾选 = 全部技能</b>。名册取自后台「内容管理-英雄数据」的<b>人工处理数据 → 技能</b>，
+          共 <b id="heroTotal">—</b> 个英雄、<b id="heroSkTotal">—</b> 条现版本技能；
+          技能总表里残留的旧版本技能与废弃天赋不在其中，<b>不会被任何英雄命中</b>。
+        </div>
+      </div>
+    </div>
+
     <div class="card" id="paneTag">
       <div class="hd"><h2>检索条件</h2><button class="btn link" id="btnClear">清空</button></div>
       <div class="bd">
@@ -238,6 +299,23 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
           <div class="grphd"><span class="t">必须排除（反选）</span><span class="hint">含任一即剔除</span>
             <button class="btn" data-add="not">+ 添加</button></div>
           <div class="rows"></div>
+        </div>
+
+        <div class="cpbox">
+          <div class="ttl">施法前摇 <span class="hint">秒 · 闭区间，可与上方 tag 条件同时生效</span></div>
+          <div class="cprow">
+            <input type="number" id="cpMin" min="0" step="0.01" placeholder="最小" title="区间下限（留空=不限）">
+            <span class="sep">~</span>
+            <input type="number" id="cpMax" min="0" step="0.01" placeholder="最大" title="区间上限（留空=不限）">
+            <span class="unit">秒</span>
+            <button class="btn link" id="cpEq0" title="填入 0 ~ 0：只看前摇恰为 0 的技能">=0</button>
+            <button class="btn link" id="cpLe015" title="填入 0 ~ 0.15">≤0.15</button>
+            <button class="btn link" id="cpReset" title="清空前摇条件">清空</button>
+          </div>
+          <div class="tip" style="margin:6px 0 0">
+            <b>0~0</b> = 恰为 0；<b>0~0.15</b> = 0–0.15（含两端）；任一侧留空 = 该侧不限。
+            技能无施法前摇数据时，<b>不参与命中</b>（结果上方会给出被排除的数量）。
+          </div>
         </div>
 
         <label class="fuzzy"><input type="checkbox" id="fuzzy"> 模糊匹配：输入子串匹配全部同名/含该词的 tag（如「防御塔」→ 友方/敌方防御塔）</label>
@@ -355,6 +433,8 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
   var EXLABEL = {};
   var EXTIP = {};
   (core.EXCLUDE_KINDS || []).forEach(function (k) { EXLABEL[k.key] = k.label; EXTIP[k.key] = k.tip; });
+  var HERO_ATTRS = ['力量', '敏捷', '智力', '全才'];
+  var ATTR_CLS = { '力量': 'a-str', '敏捷': 'a-agi', '智力': 'a-int', '全才': 'a-uni' };
 
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) {
@@ -374,6 +454,152 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
 
   var dl = $('tagOptions');
   fillTagOptions();
+
+  // ---------- 英雄筛选（名册来自后台「内容管理-英雄数据」） ----------
+  var heroSel = new Set();          // 已勾选的英雄 id（空 = 不按英雄筛选）
+
+  /** 有技能记录的英雄（「傀儡目标」这类 0 技能条目没有筛选意义） */
+  function heroList() {
+    var all = idx.heroes || [];
+    var out = all.filter(function (h) { return (idx.heroSkills.get(h.i) || 0) > 0; });
+    var rank = function (h) {
+      var k = HERO_ATTRS.indexOf(h.a);
+      return k < 0 ? HERO_ATTRS.length : k;
+    };
+    return out.slice().sort(function (a, b) { return (rank(a) - rank(b)) || (a.i - b.i); });
+  }
+
+  function heroName(id) {
+    var h = idx.id2hero.get(id);
+    return h ? (h.zh || h.en || ('#' + id)) : ('#' + id);
+  }
+
+  /** 英雄 id 列表 → 「敌法师、斧王 等 5 个」 */
+  function heroNames(ids, max) {
+    max = max || 8;
+    var list = (ids || []).map(heroName);
+    if (list.length <= max) return list.join('、');
+    return list.slice(0, max).join('、') + ' 等 ' + list.length + ' 个';
+  }
+
+  function syncHeroSum() {
+    var tot = heroList().length;
+    var n = heroSel.size;
+    $('heroSum').textContent = n ? ('已选 ' + n + ' / ' + tot) : ('全部英雄（' + tot + '）');
+    $('heroSum').style.color = n ? 'var(--pri)' : '';
+    $('heroSum').style.fontWeight = n ? '600' : '';
+    $('heroSum').title = n ? ('已选：' + heroNames(Array.from(heroSel), 20)) : '未按英雄筛选';
+    $('heroTotal').textContent = tot;
+    var sk = $('heroSkTotal');
+    if (sk) sk.textContent = idx.heroedSkills || 0;
+  }
+
+  /** 勾选状态 → chip 高亮（整格重绘成本低，但保留滚动位置） */
+  function paintHeroGrid() {
+    Array.prototype.slice.call($('heroGrid').querySelectorAll('.hchip')).forEach(function (lb) {
+      var inp = lb.querySelector('input');
+      var on = heroSel.has(Number(inp.value));
+      lb.classList.toggle('on', on);
+      if (inp.checked !== on) inp.checked = on;
+    });
+  }
+
+  function renderHeroGrid() {
+    var q = $('heroQ').value.trim().toLowerCase();
+    var all = heroList();
+    var list = all.filter(function (h) {
+      return !q || String(h.zh).toLowerCase().indexOf(q) >= 0 || String(h.en).toLowerCase().indexOf(q) >= 0;
+    });
+    if (!all.length) {
+      $('heroGrid').innerHTML = '<div class="heroEmpty">当前 data.js 不含英雄名册（旧快照）—— 请点右上角「⟳ 更新本地数据」重新抓取。</div>';
+      return;
+    }
+    if (!list.length) {
+      $('heroGrid').innerHTML = '<div class="heroEmpty">没有匹配「' + esc($('heroQ').value.trim()) + '」的英雄</div>';
+      return;
+    }
+    $('heroGrid').innerHTML = list.map(function (h) {
+      var on = heroSel.has(h.i);
+      var n = idx.heroSkills.get(h.i) || 0;
+      var nv = (idx.heroSkillsValid && idx.heroSkillsValid.get(h.i)) || 0;
+      var tip = h.zh + '（' + (h.en || '—') + '）' + (h.a ? '　·　' + h.a : '') +
+        '　·　现版本技能 ' + nv + ' 条' + (n > nv ? '（另有 ' + (n - nv) + ' 条默认被排除）' : '');
+      return '<label class="hchip' + (on ? ' on' : '') + '" title="' + esc(tip) + '">' +
+        '<input type="checkbox" value="' + h.i + '"' + (on ? ' checked' : '') + '>' +
+        '<span class="dot ' + (ATTR_CLS[h.a] || 'a-uni') + '"></span>' +
+        '<span>' + esc(h.zh || h.en) + '</span></label>';
+    }).join('');
+  }
+
+  /** 当前可见（经搜索过滤）的英雄 id */
+  function visibleHeroIds() {
+    return Array.prototype.slice.call($('heroGrid').querySelectorAll('.hchip input'))
+      .map(function (i) { return Number(i.value); });
+  }
+
+  /** 勾选变化 → 重绘 + 用同一条件重跑已有结果（两种模式各自独立）
+   *  quiet = true 时只重算并存结果，不渲染（避免把另一模式的结果画到当前表格里） */
+  function heroChanged() {
+    syncHeroSum();
+    renderHeroGrid();
+    updateExpr();
+    var qt = MODE !== 'tag', qn = MODE !== 'note';
+    if (S.tag) runTag(qt);
+    if (S.note) runNote(qn);
+    // 首次只勾英雄、还没检索过 → 直接把当前模式跑一次（英雄筛选本身就是有效条件）
+    if (!S.tag && MODE === 'tag' && heroSel.size) runTag(false);
+    if (!S.note && MODE === 'note' && heroSel.size) runNote(false);
+    redraw();
+  }
+
+  function setHeroes(ids, additive) {
+    if (!additive) heroSel.clear();
+    (ids || []).forEach(function (id) {
+      id = Number(id);
+      if (isNaN(id)) return;
+      if (additive && heroSel.has(id)) heroSel.delete(id); else heroSel.add(id);
+    });
+    heroChanged();
+  }
+
+  $('heroToggle').addEventListener('click', function () {
+    var open = $('heroBody').style.display !== 'none';
+    $('heroBody').style.display = open ? 'none' : '';
+    $('heroToggle').textContent = open ? '展开' : '收起';
+    if (!open) $('heroQ').focus();
+  });
+  $('heroQ').addEventListener('input', renderHeroGrid);
+  $('heroQ').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); if (MODE === 'tag') runTag(); else runNote(); }
+  });
+  $('heroAll').addEventListener('click', function () { setHeroes(visibleHeroIds(), false); });
+  $('heroNone').addEventListener('click', function () { setHeroes([], false); });
+  $('heroInv').addEventListener('click', function () {
+    var vis = visibleHeroIds();
+    var add = vis.filter(function (id) { return !heroSel.has(id); });
+    var del = vis.filter(function (id) { return heroSel.has(id); });
+    del.forEach(function (id) { heroSel.delete(id); });
+    add.forEach(function (id) { heroSel.add(id); });
+    heroChanged();
+  });
+  $('heroGrid').addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t || t.type !== 'checkbox') return;
+    var id = Number(t.value);
+    if (t.checked) heroSel.add(id); else heroSel.delete(id);
+    heroChanged();
+  });
+  renderHeroGrid();
+  syncHeroSum();
+
+  function readHeroes() { return Array.from(heroSel); }
+
+  /** 结果表「技能」格下的英雄行（无归属则不显示） */
+  function heroLine(h) {
+    var hs = h && h.heroes;
+    if (!hs || !hs.length) return '';
+    return '<div class="hr">' + esc(heroNames(hs.map(function (x) { return x.id; }), 3)) + '</div>';
+  }
 
   // ---------- 条件行 ----------
   var MAX = 5;
@@ -453,39 +679,83 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
     return { d: $('scD').checked, e: $('scE').checked, m: $('scM').checked, g: $('scG').checked };
   }
 
+  /** 读「施法前摇」区间输入：返回 {min, max, swapped}，空串 = 该侧不限 */
+  function readCast() {
+    var num = function (v) {
+      v = String(v == null ? '' : v).trim();
+      if (v === '') return null;
+      var n = Number(v);
+      return isNaN(n) ? null : n;
+    };
+    var min = num($('cpMin').value), max = num($('cpMax').value);
+    if (min != null && min < 0) min = 0;
+    if (max != null && max < 0) max = 0;
+    var swapped = false;
+    if (min != null && max != null && min > max) { var t = min; min = max; max = t; swapped = true; }
+    return { min: min, max: max, swapped: swapped };
+  }
+
+  /** 区间的人类可读写法 */
+  function fmtRange(min, max) {
+    var f = function (n) { return String(Math.round(n * 1000) / 1000); };
+    if (min == null && max == null) return '不限';
+    if (min == null) return '≤ ' + f(max);
+    if (max == null) return '≥ ' + f(min);
+    if (min === max) return '= ' + f(min);
+    return f(min) + ' ~ ' + f(max);
+  }
+
   // ---------- 检索（Tag 模式） ----------
-  function runTag() {
-    var q = { and: collect('and'), or: collect('or'), not: collect('not'), scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked };
-    if (!q.and.length && !q.or.length && !q.not.length) {
-      $('tblbox').innerHTML = '<div class="empty">请至少输入一个 tag</div>';
-      $('nHit').textContent = '0'; $('nScan').textContent = '';
-      S.tag = null; $('btnCsv').disabled = true;
+  function runTag(quiet) {
+    quiet = (quiet === true);
+    var cast = readCast();
+    var castOn = core.castActive(cast);
+    var tags = collect('and').length + collect('or').length + collect('not').length;
+    var heroes = readHeroes();
+    var q = {
+      and: collect('and'), or: collect('or'), not: collect('not'),
+      scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
+      cast: castOn ? { min: cast.min, max: cast.max } : null,
+      heroes: heroes
+    };
+    if (!tags && !castOn && !heroes.length) {
+      if (!quiet) {
+        $('tblbox').innerHTML = '<div class="empty">请至少输入一个 tag，或设置「施法前摇」区间，或勾选英雄</div>';
+        $('nHit').textContent = '0'; $('nScan').textContent = '';
+        $('btnCsv').disabled = true;
+      }
+      S.tag = null;
       return;
     }
-    if (!q.scope.d && !q.scope.e && !q.scope.m && !q.scope.g) {
-      $('tblbox').innerHTML = '<div class="empty">请至少选择一个「匹配范围」</div>';
+    if (tags && !q.scope.d && !q.scope.e && !q.scope.m && !q.scope.g) {
+      if (!quiet) $('tblbox').innerHTML = '<div class="empty">请至少选择一个「匹配范围」</div>';
       return;
     }
     // 同步刷新每行的解析提示（此处为最终校验：仍未匹配即标红）
     revalidateAll(true);
+    updateExpr();
 
     var r = core.search(idx, q);
-    S.tag = { query: q, result: r };
-    renderTag(r);
+    S.tag = { query: q, result: r, castSwapped: cast.swapped };
+    if (!quiet) renderTag(r);
   }
 
   // ---------- 检索（注释模式，与 Tag 模式互不影响） ----------
-  function runNote() {
-    var q = { q: $('noteQ').value.trim(), includeExcluded: $('showExN').checked };
+  function runNote(quiet) {
+    quiet = (quiet === true);
+    var q = { q: $('noteQ').value.trim(), includeExcluded: $('showExN').checked, heroes: readHeroes() };
     if (!q.q) {
-      $('tblbox').innerHTML = '<div class="empty">请输入要查找的注释内容</div>';
-      $('nHit').textContent = '0'; $('nScan').textContent = '';
-      S.note = null; $('btnCsv').disabled = true;
+      if (!quiet) {
+        $('tblbox').innerHTML = '<div class="empty">请输入要查找的注释内容</div>';
+        $('nHit').textContent = '0'; $('nScan').textContent = '';
+        $('btnCsv').disabled = true;
+      }
+      S.note = null;
       return;
     }
     var r = core.searchNotes(idx, q);
     S.note = { query: q, result: r };
-    renderNote(r);
+    if (!quiet) renderNote(r);
   }
 
   /** 升级项 chip：竖排「上图标 / 下中文名」，悬停显示网页条目全名与 wiki 占位符 */
@@ -570,8 +840,40 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
           '</b> 条。如需查看，请勾选左侧「包含被排除项」。</div>';
       }
     }
+    if (r.stats && r.stats.not && r.stats.not.on) {
+      var nt = r.stats.not;
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>反选</b>排除含 ' +
+        nt.names.map(function (x) { return '「<b>' + esc(x) + '</b>」'; }).join('、') +
+        ' 的技能 <b>' + nt.out + '</b> 条' +
+        (nt.names.length > 1 ? '（任一命中即排除）' : '') +
+        (nt.afterTag != null ? '，余 <b>' + nt.afterTag + '</b> 条参加后续筛选' : '') + '。</div>';
+    }
+    if (r.stats && r.stats.cast && r.stats.cast.on) {
+      var c = r.stats.cast;
+      var rng = fmtRange(c.min, c.max);
+      var extra = [];
+      if (c.missing) extra.push('无施法前摇数据 <b>' + c.missing + '</b> 个');
+      if (c.out) extra.push('前摇不在该区间 <b>' + c.out + '</b> 个');
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>施法前摇 ' + esc(rng) +
+        ' 秒</b>（闭区间）筛选' +
+        (extra.length ? '，在' + (r.stats.hero && r.stats.hero.on ? '符合英雄筛选且满足 tag 条件' : '满足 tag 条件') +
+          '的技能中另排除 ' + extra.join(' / ') : '') +
+        '，剩 <b>' + r.hits.length + '</b> 条。</div>';
+    }
+    if (r.stats && r.stats.hero && r.stats.hero.on) {
+      var hh = r.stats.hero;
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>英雄</b>筛选：' + esc(heroNames(hh.ids)) +
+        '（所选英雄在「人工处理数据」里共登记 <b>' + hh.pool + '</b> 条现版本技能）' +
+        (hh.out ? '，另排除未登记给所选英雄的 <b>' + hh.out + '</b> 条（含旧版本技能）' : '') + '。</div>';
+    }
+    if (S.tag && S.tag.castSwapped) {
+      html += '<div class="warnbox" style="margin:12px 14px 0">「施法前摇」最小值大于最大值，已<b>自动对调</b>为 <b>' +
+        esc(fmtRange(r.stats.cast.min, r.stats.cast.max)) + '</b> 秒。</div>';
+    }
     if (!r.hits.length) {
-      $('tblbox').innerHTML = html + '<div class="empty">没有技能满足当前条件</div>';
+      $('tblbox').innerHTML = html + '<div class="empty">没有技能满足当前条件' +
+        (r.stats && r.stats.hero && r.stats.hero.on ? '（提示：未被登记给任何英雄的条目——旧版本技能、通用天赋、废弃条目——不会被命中）' : '') +
+        '</div>';
       return;
     }
     var LIMIT = viewMode === 'compact' ? 1500 : 400;
@@ -580,16 +882,17 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
       // 每个技能 = 一个不可拆分的块（升级图标 + 技能名），整体随流换行
       html += '<div class="cmpgrid">';
       list.forEach(function (h, i) {
+        var hn = (h.heroes || []).length ? '　英雄：' + heroNames(h.heroes.map(function (x) { return x.id; }), 3) : '';
         html += '<div class="cmitem' + (h.excluded ? ' ex' : '') + '" title="' +
-          esc((h.name || '(无名)') + '　#' + h.id + '　点击查看详情') + '">' +
+          esc((h.name || '(无名)') + '　#' + h.id + hn + '　点击查看详情') + '">' +
           '<span class="cmup">' + iconOnly(h.upgrades) + '</span>' +
           '<span class="cname" data-detail="' + i + '">' + esc(h.name || '(无名)') + '</span>' +
           exTag(h) + '</div>';
       });
       html += '</div>';
     } else {
-      html += '<table><thead><tr><th style="width:156px">升级项</th><th style="width:172px">技能</th>' +
-        '<th style="width:62px">ID</th><th>命中详情</th><th style="width:56px">tag 数</th>' +
+      html += '<table class="tagTbl"><thead><tr><th style="width:156px">升级项</th><th style="width:184px">技能 / 英雄</th>' +
+        '<th style="width:62px">ID</th><th style="width:92px">施法前摇</th><th>命中详情</th><th style="width:56px">tag 数</th>' +
         '<th style="width:52px"></th></tr></thead><tbody>';
       list.forEach(function (h, i) {
         var featSeen = {};
@@ -610,8 +913,10 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
         }).join('');
         html += '<tr' + (h.excluded ? ' class="ex"' : '') + '>' +
           '<td class="upcell">' + upgradeChips(h.upgrades) + '</td>' +
-          '<td class="nm">' + esc(h.name || '(无名)') + exTag(h) + '<div class="en">' + esc(h.en) + '</div></td>' +
+          '<td class="nm">' + esc(h.name || '(无名)') + exTag(h) + '<div class="en">' + esc(h.en) + '</div>' +
+          heroLine(h) + '</td>' +
           '<td class="id">' + h.id + '</td>' +
+          '<td class="cpcell">' + (h.cast ? esc(h.cast) : '<span class="count">—</span>') + '</td>' +
           '<td>' + chips + '</td>' +
           '<td class="count">' + h.tagCount + '</td>' +
           '<td><button class="btn link" data-detail="' + i + '">详情</button></td>' +
@@ -687,6 +992,12 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
           '</b> 条非技能条目' + detail + '，检索基于其余 <b>' + r.stats.effective + '</b> 条。</div>';
       }
     }
+    if (r.stats && r.stats.hero && r.stats.hero.on) {
+      var hh = r.stats.hero;
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>英雄</b>筛选：' + esc(heroNames(hh.ids)) +
+        '（所选英雄在「人工处理数据」里共登记 <b>' + hh.pool + '</b> 条现版本技能）' +
+        (hh.out ? '，另排除未登记给所选英雄的 <b>' + hh.out + '</b> 条（含旧版本技能）' : '') + '。</div>';
+    }
     if (!r.hits.length) {
       $('tblbox').innerHTML = html + '<div class="empty">没有技能的注释包含这些内容</div>';
       return;
@@ -696,15 +1007,16 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
     if (viewMode === 'compact') {
       html += '<div class="cmpgrid">';
       list.forEach(function (h, i) {
+        var hn = (h.heroes || []).length ? '　英雄：' + heroNames(h.heroes.map(function (x) { return x.id; }), 3) : '';
         html += '<div class="cmitem' + (h.excluded ? ' ex' : '') + '" title="' +
-          esc((h.name || '(无名)') + '　#' + h.id + '　命中 ' + h.matched + ' 行　点击查看详情') + '">' +
+          esc((h.name || '(无名)') + '　#' + h.id + hn + '　命中 ' + h.matched + ' 行　点击查看详情') + '">' +
           '<span class="cmup">' + iconOnly(h.upgrades) + '</span>' +
           '<span class="cname" data-detail="' + i + '">' + esc(h.name || '(无名)') + '</span>' +
           exTag(h) + '</div>';
       });
       html += '</div>';
     } else {
-      html += '<table class="noteTbl"><thead><tr><th style="width:140px">升级项</th><th style="width:150px">技能</th>' +
+      html += '<table class="noteTbl"><thead><tr><th style="width:140px">升级项</th><th style="width:164px">技能 / 英雄</th>' +
         '<th style="width:56px">ID</th><th>命中行（注释原文）</th><th style="width:56px">命中</th>' +
         '<th style="width:56px"></th></tr></thead><tbody>';
       list.forEach(function (h, i) {
@@ -719,7 +1031,8 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
         }
         html += '<tr' + (h.excluded ? ' class="ex"' : '') + '>' +
           '<td class="upcell">' + upgradeChips(h.upgrades) + '</td>' +
-          '<td class="nm">' + esc(h.name || '(无名)') + exTag(h) + '<div class="en">' + esc(h.en) + '</div></td>' +
+          '<td class="nm">' + esc(h.name || '(无名)') + exTag(h) + '<div class="en">' + esc(h.en) + '</div>' +
+          heroLine(h) + '</td>' +
           '<td class="id">' + h.id + '</td>' +
           '<td>' + cell + '</td>' +
           '<td class="count">' + h.matched + '/' + h.noteCount + '</td>' +
@@ -748,6 +1061,7 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
     if (h.upgrades && h.upgrades.length) {
       body += '<div class="sec"><h4>升级项</h4>' + upgradeChips(h.upgrades) + '</div>';
     }
+    body += heroSec(h);
     body += '<div class="sec"><h4>技能注释（共 ' + lines.length + ' 行，命中 ' + h.matched + ' 行）</h4>' +
       (lines.length
         ? '<ul class="noteall">' + lines.map(function (l) {
@@ -762,6 +1076,16 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
   }
 
   // ---------- 技能详情 ----------
+  /** 详情弹窗的「所属英雄」段 */
+  function heroSec(h) {
+    var hs = (h && h.heroes) || [];
+    if (!hs.length) return '<div class="sec"><h4>所属英雄</h4><span class="count">（无英雄归属：通用天赋 / 历史残留条目）</span></div>';
+    return '<div class="sec"><h4>所属英雄</h4>' + hs.map(function (x) {
+      return '<span class="chip" title="英雄 id=' + x.id + (x.a ? ' · ' + esc(x.a) : '') + '">' +
+        esc(x.zh) + (x.a ? ' <span class="loc">' + esc(x.a) + '</span>' : '') + '</span>';
+    }).join('') + '</div>';
+  }
+
   function openDetail(h) {
     var d = core.describe(idx, h.ability, scope());
     var names = function (arr) {
@@ -774,6 +1098,10 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
     if (d.upgrades && d.upgrades.length) {
       body += '<div class="sec"><h4>升级项</h4>' + upgradeChips(d.upgrades) + '</div>';
     }
+    body += heroSec(h);
+    body += '<div class="sec"><h4>施法前摇</h4><span class="cpcell" style="font-size:13px">' +
+      (d.cast ? esc(d.cast) + ' 秒' : '<span class="count">（无数据）</span>') + '</span>' +
+      '<span class="count" style="margin-left:8px">后台字段 ability_cast_point</span></div>';
     if (d.detail.length) body += '<div class="sec"><h4>技能类型</h4>' + names(d.detail) + '</div>';
     if (d.mech.length) {
       body += '<div class="sec"><h4>技能特性（机制项）</h4>' +
@@ -876,23 +1204,30 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
   }
 
   function csvTag() {
-    var rows = [['升级项', '技能名', '技能ID', '英文名', '升级项（占位符）', '命中条件', 'tag总数', '排除原因']];
+    var rows = [['升级项', '技能名', '技能ID', '英文名', '英雄', '施法前摇', '升级项（占位符）', '命中条件', 'tag总数', '排除原因']];
     S.tag.result.hits.forEach(function (h) {
       var cond = h.detail.map(function (d) {
         return (d.group === 'and' ? '且:' : '或:') + d.name + '@' +
           d.loc.map(function (l) { return l.where; }).join('/');
       }).join(' | ');
-      rows.push([upNames(h.upgrades), h.name, h.id, h.en, upPh(h.upgrades), cond, h.tagCount,
+      // 反选/前摇是全库生效的过滤条件，不体现在单条命中详情里 → 单独补进「命中条件」列
+      var nq = (S.tag.query && S.tag.query.not) || [];
+      if (nq.length) cond = (cond ? cond + ' | ' : '') + nq.map(function (x) { return '非:' + x; }).join(' | ');
+      rows.push([upNames(h.upgrades), h.name, h.id, h.en, heroCsv(h), h.cast || '', upPh(h.upgrades), cond, h.tagCount,
         h.excluded ? (EXLABEL[h.excluded] || h.excluded) : '']);
     });
     downloadCsv(rows, 'tagsearch-tag');
   }
 
+  function heroCsv(h) {
+    return ((h && h.heroes) || []).map(function (x) { return x.zh; }).join('/');
+  }
+
   function csvNote() {
-    var rows = [['升级项', '技能名', '技能ID', '英文名', '命中行号', '命中行内容', '注释总行数', '排除原因']];
+    var rows = [['升级项', '技能名', '技能ID', '英文名', '英雄', '命中行号', '命中行内容', '注释总行数', '排除原因']];
     S.note.result.hits.forEach(function (h) {
       var hit = h.lines.filter(function (l) { return l.hit; });
-      rows.push([upNames(h.upgrades), h.name, h.id, h.en,
+      rows.push([upNames(h.upgrades), h.name, h.id, h.en, heroCsv(h),
         hit.map(function (l) { return 'L' + l.n; }).join(' '),
         hit.map(function (l) { return l.t; }).join(' | '),
         h.noteCount,
@@ -927,6 +1262,9 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
       : idx.abilities.length;
     var ns = core.noteStats(idx);
     $('mNotes').textContent = ns.skills ? (ns.pool + ' 行 / ' + ns.skills + ' 技能') : '无';
+    $('mHero').textContent = (idx.heroes && idx.heroes.length)
+      ? (heroList().length + '（有技能，名册 ' + idx.heroes.length + '）')
+      : '无';
   }
   function fillTagOptions() {
     dl.innerHTML = idx.names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
@@ -951,7 +1289,11 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
     var hadTag = !!(S.tag && S.tag.query), hadNote = !!(S.note && S.note.query);
     window.TAGDB = db; DB = db; idx = core.createIndex(db);
     S.tag = null; S.note = null;
+    // 新数据可能没有某些英雄 → 剔除失效勾选，再重绘名册
+    var alive = new Set((idx.heroes || []).map(function (h) { return h.i; }));
+    Array.from(heroSel).forEach(function (id) { if (!alive.has(id)) heroSel.delete(id); });
     setMeta(); fillTagOptions(); revalidateAll(true);
+    renderHeroGrid(); syncHeroSum(); updateExpr();
     ulog('已载入数据：Tag ' + db.tags.length + ' 条 / 技能 ' + db.abilities.length +
       ' 条（' + (src || '未知来源') + '）', 'ok');
     if (MODE === 'tag' && hadTag) { ulog('按当前条件重新检索…', 'dim'); runTag(); }
@@ -1126,7 +1468,50 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
     loadFromText: loadFromText, doUpdate: doUpdate,
     setMode: setMode, runTag: runTag, runNote: runNote,
     mode: function () { return MODE; },
-    searchNotes: function (q) { return core.searchNotes(idx, { q: q, includeExcluded: $('showExN').checked }); },
+    searchNotes: function (q) {
+      return core.searchNotes(idx, { q: q, includeExcluded: $('showExN').checked, heroes: readHeroes() });
+    },
+    /** 检索前摇区间（供自动化/测试）：min/max 传 null 表示该侧不限 */
+    searchCast: function (min, max) {
+      var q = {
+        and: collect('and'), or: collect('or'), not: collect('not'),
+        scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
+        cast: (min == null && max == null) ? null : { min: min, max: max },
+        heroes: readHeroes()
+      };
+      return core.search(idx, q);
+    },
+    /** 只按英雄筛选（供自动化/测试）：ids 为英雄 id 数组，空数组=全部 */
+    searchHeroes: function (ids) {
+      var q = {
+        and: collect('and'), or: collect('or'), not: collect('not'),
+        scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
+        cast: null, heroes: ids || []
+      };
+      return core.search(idx, q);
+    },
+    /** 设置/读取英雄勾选（界面同步刷新） */
+    setHeroes: function (ids) { setHeroes(ids || [], false); return readHeroes(); },
+    heroes: function () {
+      return {
+        total: (idx.heroes || []).length,
+        selectable: heroList().length,
+        selected: readHeroes(),
+        heroedSkills: idx.heroedSkills,
+        unexplainedSkills: idx.unexplainedSkills
+      };
+    },
+    heroOf: function (id) {
+      var a = idx.abilities.filter(function (x) { return x.i === id; })[0];
+      return a ? core.heroesOf(idx, a) : null;
+    },
+    castPoints: function (id) {
+      var a = idx.abilities.filter(function (x) { return x.i === id; })[0];
+      return a ? { raw: a.cp || '', vals: core.castPoints(a) } : null;
+    },
+    castSkills: function () {
+      return idx.abilities.filter(function (a) { return core.castPoints(a).length; }).length;
+    },
     info: function () {
       var ns = core.noteStats(idx);
       return {
@@ -1134,6 +1519,8 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
         excludedTotal: idx.excludedTotal, excludedBy: idx.excludedBy,
         includeExcluded: $('showEx').checked,
         mode: MODE, notePool: ns.pool, noteSkills: ns.skills,
+        heroTotal: (idx.heroes || []).length, heroSelected: readHeroes().length,
+        heroedSkills: idx.heroedSkills, unexplainedSkills: idx.unexplainedSkills,
         hasTag: !!S.tag, hasNote: !!S.note
       };
     }
@@ -1159,7 +1546,19 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
     var seg = [];
     if (a.length) seg.push('(<span class="p and">且</span>' + a.map(esc2).join(' <span class="join">且</span> ') + ')');
     if (o.length) seg.push('(<span class="p or">或</span>' + o.map(esc2).join(' <span class="join">或</span> ') + ')');
-    if (n.length) seg.push('(<span class="p not">非</span>' + n.map(esc2).join(' <span class="join">或</span> ') + ')');
+    if (n.length) {
+      // 反选组内多项的语义是「这些都要排除」→ 用「且」连接，并对每一项都加「非」
+      seg.push('(' + n.map(function (x) {
+        return '<span class="p not">非</span>' + esc2(x);
+      }).join(' <span class="join">且</span> ') + ')');
+    }
+    var cast = readCast();
+    if (core.castActive(cast)) {
+      seg.push('(<span class="p cp">前摇</span>' + esc(fmtRange(cast.min, cast.max)) + ' 秒)');
+    }
+    if (heroSel.size) {
+      seg.push('(<span class="p hp">英雄</span>' + esc(heroNames(Array.from(heroSel), 4)) + ')');
+    }
     var ww = (o.length === 1)
       ? '<span class="ww">⚠ 「或」只填了 1 项 —— 此时它等价于「且」（必须包含该项），不构成「或」。「或」至少需要 2 项。</span>'
       : '';
@@ -1175,8 +1574,27 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
   $('btnClear').addEventListener('click', function () {
     KINDS.forEach(function (k) { rowsOf(k).innerHTML = ''; addRow(k, true); });
     refreshAddBtns();
+    $('cpMin').value = ''; $('cpMax').value = '';
+    updateExpr();
     S.tag = null;
     if (MODE === 'tag') showEmpty(); else $('btnCsv').disabled = !S.note;
+  });
+
+  // 施法前摇：快捷填充（改完立即用当前条件重跑）
+  function setCast(min, max) {
+    $('cpMin').value = (min == null) ? '' : String(min);
+    $('cpMax').value = (max == null) ? '' : String(max);
+    updateExpr();
+    if (S.tag) runTag();
+  }
+  $('cpEq0').addEventListener('click', function () { setCast(0, 0); });
+  $('cpLe015').addEventListener('click', function () { setCast(0, 0.15); });
+  $('cpReset').addEventListener('click', function () { setCast(null, null); });
+  // 前摇输入框回车 → 直接检索
+  ['cpMin', 'cpMax'].forEach(function (id) {
+    $(id).addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); runTag(); }
+    });
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.list) { e.preventDefault(); runTag(); }
