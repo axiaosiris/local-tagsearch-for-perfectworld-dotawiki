@@ -1,9 +1,10 @@
 // fetch_tagdb —— 抓取「Tag管理」全量标签 + 「技能」全量 tag 数据（供离线检索工具 tagsearch 使用）
 // 入参：无（A.compact=1 精简输出，默认 1）
-// 输出：{ ok, fetchedAt, tags:[{id,name,c1,c2}], abilities:[{i,n,en,d,g,m,f,e}] }
+// 输出：{ ok, fetchedAt, tags:[{id,name,c1,c2}], abilities:[{i,n,en,d,g,m,f,e,note}] }
 //   d=skill_detail(技能类型 id)  g=tags 字段 id  m=skill_mechanism(mechanism_tag id)
 //   f=[{i:mechanism_tag  id, c:mechanism_input 特性内容}]  与 m 同序（技能特性的文本，供检索器展示）
 //   e=[{n:效果行名, t:[effect_tag id…]}]
+//   note=skill_notes 原始富文本 HTML（技能注释，构建阶段转成纯文本行）
 (async function () {
   var A = window.__A || {};
 
@@ -69,7 +70,8 @@
         g: ids(x.tags),
         m: mech,
         f: feat,
-        e: eff
+        e: eff,
+        note: String(x.skill_notes == null ? '' : x.skill_notes)
       });
     });
     if (L2.length < 100) break;

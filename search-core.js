@@ -1,5 +1,10 @@
-/* search-core.js —— Tag 检索核心逻辑（浏览器 / Node 通用，无依赖）
- * 条件模型：
+/* search-core.js —— 检索核心逻辑（浏览器 / Node 通用，无依赖）
+ *
+ * 两条**完全独立**的检索线（同一时间界面只展示其中一条）：
+ *   A. Tag 检索 —— 按标签（tag）匹配技能的类型 / 效果 / 特性 / tags 字段
+ *   B. 注释检索 —— 在技能注释（skill_notes 富文本转成的纯文本行）中查找关键词
+ *
+ * A 的条件模型：
  *   and: [tagName…] 必须全部包含（且）
  *   or : [tagName…] 至少包含其一（或）——为空则不参与判断
  *   not: [tagName…] 全部不得包含（反选/排除）
@@ -62,6 +67,7 @@
       names: names,
       abilities: abilities,
       featText: db.featText || {},
+      notePool: db.notePool || [],
       excludedBy: excludedBy,
       excludedTotal: excludedTotal,
       fetchedAt: db.fetchedAt || ''
@@ -94,6 +100,96 @@
         c2: t ? t.c2 : ''
       };
     });
+  }
+
+  /* ---------- 技能注释 ----------
+   * 数据侧：build_data.py 把 skill_notes 富文本转成「纯文本行」并按行去重成
+   *   全局行池 notePool = [行文本…]，技能侧 nt = 行池下标数组、ni = 与之等长的缩进层级。
+   * 命中行号按技能内顺序 1 起计（与网页注释的行序一致，供人工回查）。 */
+
+  /** 某技能的注释行：[{n:行号, t:文本, ind:缩进层级}] */
+  function noteLines(index, a) {
+    var pool = (index && index.notePool) || [];
+    var nt = (a && a.nt) || [];
+    var ni = (a && a.ni) || [];
+    var out = [];
+    for (var k = 0; k < nt.length; k++) {
+      var t = pool[nt[k]];
+      if (t == null) continue;
+      out.push({ n: k + 1, t: t, ind: ni[k] || 0 });
+    }
+    return out;
+  }
+
+  /** 注释数据概况：{pool:行池大小, skills:带注释的技能数} —— 旧数据（无 notePool）返回 0 */
+  function noteStats(index) {
+    var pool = (index && index.notePool) || [];
+    var skills = 0;
+    ((index && index.abilities) || []).forEach(function (a) { if ((a.nt || []).length) skills++; });
+    return { pool: pool.length, skills: skills };
+  }
+
+  /** 注释检索（与 tag 检索完全独立）
+   * query = {q:'查找内容', includeExcluded:bool}
+   *   多个词用空白分隔 → 需全部出现（AND），英文不区分大小写。
+   * 命中项：{id,name,en,ability,upgrades,excluded,lines[{n,t,ind,hit}],matched,count,noteCount}
+   * 排序：命中行数 ↓ → 词频 ↓ → id ↓ */
+  function searchNotes(index, query) {
+    query = query || {};
+    var terms = String(query.q == null ? '' : query.q).split(/\s+/)
+      .map(function (s) { return s.trim(); }).filter(Boolean);
+    var lows = terms.map(function (s) { return s.toLowerCase(); });
+    var showExcluded = !!query.includeExcluded;
+    var hits = [];
+    var skipped = 0;
+    var base = {
+      terms: terms,
+      hits: hits,
+      scanned: index.abilities.length,
+      stats: {
+        total: index.abilities.length,
+        excludedTotal: index.excludedTotal || 0,
+        excludedBy: index.excludedBy || { noUse: 0, custom: 0, junk: 0 },
+        skipped: 0,
+        effective: index.abilities.length - (index.excludedTotal || 0),
+        includeExcluded: showExcluded,
+        noteSkills: noteStats(index).skills
+      }
+    };
+    if (!lows.length) return base;
+
+    index.abilities.forEach(function (a) {
+      var ex = excludeKind(a);
+      if (ex && !showExcluded) { skipped++; return; }
+      var lines = noteLines(index, a);
+      if (!lines.length) return;
+      var full = lines.map(function (l) { return l.t; }).join('\n').toLowerCase();
+      var count = 0;
+      for (var i = 0; i < lows.length; i++) {
+        var q = lows[i], from = 0, c = 0, p;
+        while ((p = full.indexOf(q, from)) >= 0) { c++; from = p + q.length; }
+        if (!c) return;                        // 任一词未出现 → 不命中（AND）
+        count += c;
+      }
+      var matched = 0;
+      var ls = lines.map(function (l) {
+        var lo = l.t.toLowerCase();
+        var hit = false;
+        for (var j = 0; j < lows.length; j++) { if (lo.indexOf(lows[j]) >= 0) { hit = true; break; } }
+        if (hit) matched++;
+        return { n: l.n, t: l.t, ind: l.ind, hit: hit };
+      });
+      hits.push({
+        id: a.i, name: a.n, en: a.en, ability: a, upgrades: upgrades(a),
+        excluded: ex || null, lines: ls, matched: matched, count: count, noteCount: ls.length
+      });
+    });
+
+    hits.sort(function (x, y) {
+      return (y.matched - x.matched) || (y.count - x.count) || (y.id - x.id);
+    });
+    base.stats.skipped = skipped;
+    return base;
   }
 
   function normalizeScope(scope) {
@@ -295,6 +391,9 @@
   return {
     createIndex: createIndex,
     search: search,
+    searchNotes: searchNotes,
+    noteLines: noteLines,
+    noteStats: noteStats,
     tagSet: tagSet,
     locations: locations,
     describe: describe,

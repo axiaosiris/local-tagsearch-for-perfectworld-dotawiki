@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>技能 Tag 检索器 · DOTA2-WIKI</title>
+<title>技能检索器 · DOTA2-WIKI</title>
 <style>
 :root{
   --bg:#f4f6f9; --panel:#fff; --line:#e2e6ec; --line2:#eef1f5;
@@ -61,7 +61,9 @@ header .meta b{color:#374151;font-weight:600}
 .rowitem{display:block}
 .resol.soft{color:#98a2b3}
 .actions{display:flex;align-items:center;gap:10px;margin-top:12px}
-.fuzzy{font-size:12.5px;color:var(--sub);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.fuzzy{font-size:12.5px;color:var(--sub);display:flex;align-items:flex-start;gap:6px;cursor:pointer;user-select:none}
+.fuzzy input{margin-top:3px;flex:none}
+.fuzzy .fz{flex:1;min-width:0}
 .sum{padding:11px 14px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:14px;
   flex-wrap:wrap;font-size:13px}
 .sum b.n{color:var(--pri);font-size:16px}
@@ -171,19 +173,45 @@ td.upcell{white-space:normal;vertical-align:middle}
 .svcline input:focus{border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-bg)}
 .st{font-size:12px;color:var(--sub)}
 .st .g{color:#0f9d58;font-weight:600} .st .r{color:var(--not);font-weight:600}
+/* ---------- 模式切换（Tag 检索 / 注释检索，同一时间只展示一种） ---------- */
+.modes{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#f7f9fc}
+.mbtn{border:0;background:transparent;padding:5px 14px;font:13px/1.5 inherit;color:#4a5568;cursor:pointer}
+.mbtn+.mbtn{border-left:1px solid var(--line)}
+.mbtn:hover{background:#eef2f8}
+.mbtn.on{background:#fff;color:var(--pri);font-weight:650;box-shadow:inset 0 -2px 0 var(--pri)}
+/* ---------- 注释检索 ---------- */
+.noteq{width:100%;padding:8px 10px;font:13px/1.6 inherit;color:var(--text);border:1px solid var(--line);
+  border-radius:8px;background:#fff;outline:none;resize:vertical;min-height:68px}
+.noteq:focus{border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-bg)}
+.nline{line-height:1.62;margin-bottom:2px;white-space:normal}
+.nline .ln{display:inline-block;min-width:26px;color:#a6b0bd;font-size:11px;font-variant-numeric:tabular-nums}
+.nline.more{color:var(--sub);font-size:12px}
+mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
+.noteall{margin:0;padding:0;list-style:none}
+.noteall li{line-height:1.72;white-space:pre-wrap;padding:1px 4px;border-radius:4px}
+.noteall li.hit{background:#fffbe6}
+.noteall .ln{color:#a6b0bd;font-size:11px;margin-right:6px;font-variant-numeric:tabular-nums}
+/* 注释表列较多：固定布局让声明列宽生效（否则长文本会挤压末两列），窄窗口改为横向滚动 */
+.tblbox table.noteTbl{min-width:700px;table-layout:fixed}
+.nline{word-break:break-word}
+.noteTbl td:last-child{white-space:nowrap;padding-left:4px;padding-right:6px}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>技能 Tag 检索器</h1>
-  <div class="meta">数据快照 <b id="mTime">—</b> ｜ Tag <b id="mTags">—</b> 条 ｜ 技能 <b id="mAbs">—</b> 条</div>
+  <h1>技能检索器</h1>
+  <div class="modes" id="modes">
+    <button class="mbtn on" data-mode="tag" title="按 tag（标签）检索技能">Tag 检索</button>
+    <button class="mbtn" data-mode="note" title="在技能注释里查找文字">注释检索</button>
+  </div>
+  <div class="meta">数据快照 <b id="mTime">—</b> ｜ Tag <b id="mTags">—</b> 条 ｜ 技能 <b id="mAbs">—</b> 条 ｜ 注释 <b id="mNotes">—</b> 条</div>
   <div class="hdact"><button class="btn" id="btnUpdate" title="从 partner 后台抓取最新数据">⟳ 更新本地数据</button></div>
 </header>
 
 <div class="wrap">
   <aside class="side">
-    <div class="card">
+    <div class="card" id="paneTag">
       <div class="hd"><h2>检索条件</h2><button class="btn link" id="btnClear">清空</button></div>
       <div class="bd">
         <div class="scope">
@@ -213,7 +241,7 @@ td.upcell{white-space:normal;vertical-align:middle}
         </div>
 
         <label class="fuzzy"><input type="checkbox" id="fuzzy"> 模糊匹配：输入子串匹配全部同名/含该词的 tag（如「防御塔」→ 友方/敌方防御塔）</label>
-        <label class="fuzzy"><input type="checkbox" id="showEx"> 包含被排除项：默认不检索 <b>废弃条目</b>（名含「废」）、<b>自定义技能</b>（id ≥ 20000）、<b>公式残条</b>（名以「-{」开头）</label>
+        <label class="fuzzy"><input type="checkbox" id="showEx"> <span class="fz">包含被排除项：默认不检索 <b>废弃条目</b>（名含「废」）、<b>自定义技能</b>（id ≥ 20000）、<b>公式残条</b>（名以「-{」开头）</span></label>
 
         <div class="expr" id="expr"><span class="dim">当前条件：（未设置）</span></div>
 
@@ -224,6 +252,30 @@ td.upcell{white-space:normal;vertical-align:middle}
         <div class="tip">
           三类可<b>任意组合、同时生效</b>：命中 =（<b>且</b> 全部满足）<b>且</b>（<b>或</b> 至少一项）<b>且</b>（<b>非</b> 一个都不满足）。
           上方「当前条件」会实时显示最终表达式。输入 tag 名称时会自动补全；若名称有多档（如「友方防御塔」含 目标/神杖/魔晶/天赋），命中任一档即算包含。
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="paneNote" style="display:none">
+      <div class="hd"><h2>注释检索</h2><button class="btn link" id="btnClearN">清空</button></div>
+      <div class="bd">
+        <div class="ttl" style="width:100%;font-size:12px;color:var(--sub);margin-bottom:6px">
+          在「技能注释」（后台富文本）里查找文字
+        </div>
+        <textarea id="noteQ" class="noteq" spellcheck="false"
+          placeholder="输入要查找的内容，例如：粘滞时间"></textarea>
+        <div class="tip" style="margin-top:6px">
+          多个词用<b>空格</b>分隔 = 需<b>同时包含</b>（且）；英文不区分大小写。命中按「注释行」显示，行号与网页注释行序一致。
+        </div>
+        <label class="fuzzy" style="margin-top:6px"><input type="checkbox" id="showExN"> <span class="fz">包含被排除项（废弃 / 自定义 / 公式残条）</span></label>
+        <div class="actions">
+          <button class="btn pri" id="btnRunN">检 索</button>
+          <span class="tip" style="margin:0">回车执行 · Shift+回车换行</span>
+        </div>
+        <div id="noteWarn"></div>
+        <div class="tip">
+          与 Tag 检索<b>互不影响</b>：两种模式各自保留输入与结果，切换时直接还原；
+          但<b>同一时间只展示其中一种</b>检索。
         </div>
       </div>
     </div>
@@ -297,7 +349,8 @@ td.upcell{white-space:normal;vertical-align:middle}
   var DB = window.TAGDB;
   var core = window.TagSearch;
   var idx = null;
-  var last = null;
+  var MODE = 'tag';                  // 'tag' Tag 检索 | 'note' 注释检索 —— 同一时间只展示一种
+  var S = { tag: null, note: null }; // 两种模式各自的上次检索（{query, result}），互不影响
   var viewMode = 'full';   // 'full' 详细（默认） | 'compact' 简洁（仅升级图标 + 技能名）
   var EXLABEL = {};
   var EXTIP = {};
@@ -400,13 +453,13 @@ td.upcell{white-space:normal;vertical-align:middle}
     return { d: $('scD').checked, e: $('scE').checked, m: $('scM').checked, g: $('scG').checked };
   }
 
-  // ---------- 检索 ----------
-  function run() {
+  // ---------- 检索（Tag 模式） ----------
+  function runTag() {
     var q = { and: collect('and'), or: collect('or'), not: collect('not'), scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked };
     if (!q.and.length && !q.or.length && !q.not.length) {
       $('tblbox').innerHTML = '<div class="empty">请至少输入一个 tag</div>';
       $('nHit').textContent = '0'; $('nScan').textContent = '';
-      last = null; $('btnCsv').disabled = true;
+      S.tag = null; $('btnCsv').disabled = true;
       return;
     }
     if (!q.scope.d && !q.scope.e && !q.scope.m && !q.scope.g) {
@@ -417,8 +470,22 @@ td.upcell{white-space:normal;vertical-align:middle}
     revalidateAll(true);
 
     var r = core.search(idx, q);
-    last = { query: q, result: r };
-    render(r);
+    S.tag = { query: q, result: r };
+    renderTag(r);
+  }
+
+  // ---------- 检索（注释模式，与 Tag 模式互不影响） ----------
+  function runNote() {
+    var q = { q: $('noteQ').value.trim(), includeExcluded: $('showExN').checked };
+    if (!q.q) {
+      $('tblbox').innerHTML = '<div class="empty">请输入要查找的注释内容</div>';
+      $('nHit').textContent = '0'; $('nScan').textContent = '';
+      S.note = null; $('btnCsv').disabled = true;
+      return;
+    }
+    var r = core.searchNotes(idx, q);
+    S.note = { query: q, result: r };
+    renderNote(r);
   }
 
   /** 升级项 chip：竖排「上图标 / 下中文名」，悬停显示网页条目全名与 wiki 占位符 */
@@ -473,16 +540,17 @@ td.upcell{white-space:normal;vertical-align:middle}
     b.classList.toggle('on', compact);
   }
 
-  function render(r) {
+  function renderTag(r) {
     $('nHit').textContent = r.hits.length;
     $('nScan').textContent = '（全库扫描 ' + r.scanned + ' 条）';
     $('btnCsv').disabled = r.hits.length === 0;
     updateViewBtn();
 
     var html = '';
-    if (last && last.query && last.query.or && last.query.or.length === 1) {
+    var tq = S.tag && S.tag.query;
+    if (tq && tq.or && tq.or.length === 1) {
       html += '<div class="warnbox" style="margin:12px 14px 0">「或」组只填了 1 项（<b>' +
-        esc(last.query.or[0]) + '</b>），此时它<b>等价于「且」</b>；若要表达「或」（至少满足其一），请至少填 2 项。</div>';
+        esc(tq.or[0]) + '</b>），此时它<b>等价于「且」</b>；若要表达「或」（至少满足其一），请至少填 2 项。</div>';
     }
     if (r.unknown.length) {
       html += '<div class="warnbox" style="margin:12px 14px 0">未识别的 tag：<b>' +
@@ -562,6 +630,137 @@ td.upcell{white-space:normal;vertical-align:middle}
     });
   }
 
+  // ---------- 注释检索：渲染 ----------
+  /** 把文本中的关键词标黄（大小写不敏感，重叠区间合并） */
+  function markUp(text, terms) {
+    var t = String(text == null ? '' : text);
+    if (!terms || !terms.length) return esc(t);
+    var low = t.toLowerCase(), ranges = [];
+    terms.forEach(function (term) {
+      var q = String(term || '').toLowerCase();
+      if (!q) return;
+      var from = 0, p;
+      while ((p = low.indexOf(q, from)) >= 0) { ranges.push([p, p + q.length]); from = p + q.length; }
+    });
+    if (!ranges.length) return esc(t);
+    ranges.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    var merged = [], cur = ranges[0];
+    for (var i = 1; i < ranges.length; i++) {
+      var r = ranges[i];
+      if (r[0] <= cur[1]) { if (r[1] > cur[1]) cur[1] = r[1]; }
+      else { merged.push(cur); cur = r; }
+    }
+    merged.push(cur);
+    var out = '', pos = 0;
+    merged.forEach(function (r) {
+      out += esc(t.slice(pos, r[0])) + '<mark>' + esc(t.slice(r[0], r[1])) + '</mark>';
+      pos = r[1];
+    });
+    return out + esc(t.slice(pos));
+  }
+
+  /** 注释行缩进（层级 × 14px） */
+  function indStyle(ind) { return ind ? ' style="padding-left:' + (ind * 14) + 'px"' : ''; }
+
+  function renderNote(r) {
+    $('nHit').textContent = r.hits.length;
+    $('nScan').textContent = '（全库扫描 ' + r.scanned + ' 条注释）';
+    $('btnCsv').disabled = r.hits.length === 0;
+    updateViewBtn();
+
+    var terms = r.terms || [];
+    $('noteWarn').innerHTML = (r.stats && !r.stats.noteSkills)
+      ? '<div class="warnbox">当前 data.js 不含注释内容（旧快照）—— 请点右上角「⟳ 更新本地数据」重新抓取一次。</div>'
+      : '';
+
+    var html = '';
+    if (r.stats) {
+      var sb = r.stats.excludedBy || {};
+      var parts = core.EXCLUDE_KINDS.filter(function (k) { return sb[k.key]; })
+        .map(function (k) { return k.label + ' <b>' + sb[k.key] + '</b>'; });
+      var detail = parts.length ? '（' + parts.join(' / ') + '）' : '';
+      if (r.stats.includeExcluded) {
+        html += '<div class="infobox" style="margin:12px 14px 0">已<b>包含</b>被排除项' + detail +
+          '，共 <b>' + r.stats.excludedTotal + '</b> 条 —— 下方这类条目已灰显并标注原因。</div>';
+      } else if (r.stats.excludedTotal) {
+        html += '<div class="infobox" style="margin:12px 14px 0">已默认排除 <b>' + r.stats.excludedTotal +
+          '</b> 条非技能条目' + detail + '，检索基于其余 <b>' + r.stats.effective + '</b> 条。</div>';
+      }
+    }
+    if (!r.hits.length) {
+      $('tblbox').innerHTML = html + '<div class="empty">没有技能的注释包含这些内容</div>';
+      return;
+    }
+    var LIMIT = viewMode === 'compact' ? 1500 : 400;
+    var list = r.hits.slice(0, LIMIT);
+    if (viewMode === 'compact') {
+      html += '<div class="cmpgrid">';
+      list.forEach(function (h, i) {
+        html += '<div class="cmitem' + (h.excluded ? ' ex' : '') + '" title="' +
+          esc((h.name || '(无名)') + '　#' + h.id + '　命中 ' + h.matched + ' 行　点击查看详情') + '">' +
+          '<span class="cmup">' + iconOnly(h.upgrades) + '</span>' +
+          '<span class="cname" data-detail="' + i + '">' + esc(h.name || '(无名)') + '</span>' +
+          exTag(h) + '</div>';
+      });
+      html += '</div>';
+    } else {
+      html += '<table class="noteTbl"><thead><tr><th style="width:140px">升级项</th><th style="width:150px">技能</th>' +
+        '<th style="width:56px">ID</th><th>命中行（注释原文）</th><th style="width:56px">命中</th>' +
+        '<th style="width:56px"></th></tr></thead><tbody>';
+      list.forEach(function (h, i) {
+        var SHOW = 4;
+        var hitLines = h.lines.filter(function (l) { return l.hit; });
+        var cell = hitLines.slice(0, SHOW).map(function (l) {
+          return '<div class="nline"' + indStyle(l.ind) + '><span class="ln">L' + l.n + '</span>' +
+            markUp(l.t, terms) + '</div>';
+        }).join('');
+        if (hitLines.length > SHOW) {
+          cell += '<div class="nline more">… 另有 ' + (hitLines.length - SHOW) + ' 行命中</div>';
+        }
+        html += '<tr' + (h.excluded ? ' class="ex"' : '') + '>' +
+          '<td class="upcell">' + upgradeChips(h.upgrades) + '</td>' +
+          '<td class="nm">' + esc(h.name || '(无名)') + exTag(h) + '<div class="en">' + esc(h.en) + '</div></td>' +
+          '<td class="id">' + h.id + '</td>' +
+          '<td>' + cell + '</td>' +
+          '<td class="count">' + h.matched + '/' + h.noteCount + '</td>' +
+          '<td><button class="btn link" data-detail="' + i + '">详情</button></td>' +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+    }
+    if (r.hits.length > LIMIT) {
+      html += '<div class="empty">已显示前 ' + LIMIT + ' 条，共 ' + r.hits.length +
+        ' 条 —— 请用「导出 CSV」查看全部。</div>';
+    }
+    $('tblbox').innerHTML = html;
+
+    Array.prototype.slice.call($('tblbox').querySelectorAll('[data-detail]')).forEach(function (b) {
+      b.addEventListener('click', function () { openNoteDetail(list[+b.getAttribute('data-detail')]); });
+    });
+  }
+
+  /** 注释模式：详情（完整注释，逐行 + 缩进，命中行标黄） */
+  function openNoteDetail(h) {
+    var r = S.note && S.note.result;
+    var terms = (r && r.terms) || [];
+    var lines = h.lines || [];
+    var body = '';
+    if (h.upgrades && h.upgrades.length) {
+      body += '<div class="sec"><h4>升级项</h4>' + upgradeChips(h.upgrades) + '</div>';
+    }
+    body += '<div class="sec"><h4>技能注释（共 ' + lines.length + ' 行，命中 ' + h.matched + ' 行）</h4>' +
+      (lines.length
+        ? '<ul class="noteall">' + lines.map(function (l) {
+            return '<li' + (l.hit ? ' class="hit"' : '') + indStyle(l.ind) + '>' +
+              '<span class="ln">L' + l.n + '</span>' + markUp(l.t, terms) + '</li>';
+          }).join('') + '</ul>'
+        : '<div class="empty">该技能没有注释</div>') + '</div>';
+    $('mTitle').innerHTML = esc(h.name || '(无名)') + '　#' + h.id + '　' + esc(h.en) +
+      (h.excluded ? '　<span class="xmark">已排除：' + esc(EXLABEL[h.excluded] || h.excluded) + '</span>' : '');
+    $('mBody').innerHTML = body;
+    $('mask').classList.add('on');
+  }
+
   // ---------- 技能详情 ----------
   function openDetail(h) {
     var d = core.describe(idx, h.ability, scope());
@@ -600,37 +799,56 @@ td.upcell{white-space:normal;vertical-align:middle}
     if (e.key === 'Escape') { $('mask').classList.remove('on'); $('updMask').classList.remove('on'); }
   });
 
-  // ---------- 导出 ----------
-  // 简/详 展示切换（默认详细）
+  // ---------- 模式切换 / 结果重绘 ----------
+  function showEmpty() {
+    $('nHit').textContent = '0';
+    $('nScan').textContent = '';
+    $('btnCsv').disabled = true;
+    $('tblbox').innerHTML = MODE === 'tag'
+      ? '<div class="empty">在左侧输入 tag 名称后点击「检索」</div>'
+      : '<div class="empty">在左侧输入要查找的注释内容后点击「检索」</div>';
+    updateViewBtn();
+  }
+
+  /** 就地重绘当前模式的结果（切换简/详、切换模式时用，不重新检索） */
+  function redraw() {
+    var st = MODE === 'tag' ? S.tag : S.note;
+    if (!st) { showEmpty(); return; }
+    if (MODE === 'tag') renderTag(st.result); else renderNote(st.result);
+  }
+
+  /** 注释数据缺失提示（旧快照没有 notePool） */
+  function syncNoteWarn() {
+    var ns = core.noteStats(idx);
+    $('noteWarn').innerHTML = ns.skills
+      ? ''
+      : '<div class="warnbox">当前 data.js 不含注释内容（旧快照）—— 请点右上角「⟳ 更新本地数据」重新抓取一次。</div>';
+  }
+
+  function setMode(m) {
+    MODE = m === 'note' ? 'note' : 'tag';
+    $('paneTag').style.display = MODE === 'tag' ? '' : 'none';
+    $('paneNote').style.display = MODE === 'note' ? '' : 'none';
+    Array.prototype.slice.call($('modes').querySelectorAll('.mbtn')).forEach(function (b) {
+      b.classList.toggle('on', b.getAttribute('data-mode') === MODE);
+    });
+    if (MODE === 'note') syncNoteWarn();
+    redraw();
+  }
+
+  Array.prototype.slice.call($('modes').querySelectorAll('.mbtn')).forEach(function (b) {
+    b.addEventListener('click', function () { setMode(b.getAttribute('data-mode')); });
+  });
+
+  // 简/详 展示切换（默认详细）—— 两种模式共用，切换时就地重绘
   $('btnView').addEventListener('click', function () {
     viewMode = viewMode === 'full' ? 'compact' : 'full';
     updateViewBtn();
-    if (last) render(last.result);   // 已有结果则就地重渲染，无需重新检索
+    redraw();
   });
 
-  $('btnCsv').addEventListener('click', function () {
-    if (!last) return;
-    var rows = [['升级项', '技能名', '技能ID', '英文名', '升级项（占位符）', '命中条件', 'tag总数', '排除原因']];
-    var upNames = function (list) {
-      return (list || []).map(function (id) {
-        var m = core.UPGRADE_META[id];
-        return m ? m.label : id;
-      }).join('/');
-    };
-    var upPh = function (list) {
-      return (list || []).map(function (id) {
-        var m = core.UPGRADE_META[id];
-        return m && m.ph ? m.ph : '{%' + id + '%}';
-      }).join(' ');
-    };
-    last.result.hits.forEach(function (h) {
-      var cond = h.detail.map(function (d) {
-        return (d.group === 'and' ? '且:' : '或:') + d.name + '@' +
-          d.loc.map(function (l) { return l.where; }).join('/');
-      }).join(' | ');
-      rows.push([upNames(h.upgrades), h.name, h.id, h.en, upPh(h.upgrades), cond, h.tagCount,
-        h.excluded ? (EXLABEL[h.excluded] || h.excluded) : '']);
-    });
+  // ---------- 导出 ----------
+  function downloadCsv(rows, name) {
     var csv = rows.map(function (r) {
       return r.map(function (c) {
         c = String(c == null ? '' : c);
@@ -640,8 +858,52 @@ td.upcell{white-space:normal;vertical-align:middle}
     var blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'tagsearch-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.download = name + '-' + new Date().toISOString().slice(0, 10) + '.csv';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+
+  function upNames(list) {
+    return (list || []).map(function (id) {
+      var m = core.UPGRADE_META[id];
+      return m ? m.label : id;
+    }).join('/');
+  }
+  function upPh(list) {
+    return (list || []).map(function (id) {
+      var m = core.UPGRADE_META[id];
+      return m && m.ph ? m.ph : '{%' + id + '%}';
+    }).join(' ');
+  }
+
+  function csvTag() {
+    var rows = [['升级项', '技能名', '技能ID', '英文名', '升级项（占位符）', '命中条件', 'tag总数', '排除原因']];
+    S.tag.result.hits.forEach(function (h) {
+      var cond = h.detail.map(function (d) {
+        return (d.group === 'and' ? '且:' : '或:') + d.name + '@' +
+          d.loc.map(function (l) { return l.where; }).join('/');
+      }).join(' | ');
+      rows.push([upNames(h.upgrades), h.name, h.id, h.en, upPh(h.upgrades), cond, h.tagCount,
+        h.excluded ? (EXLABEL[h.excluded] || h.excluded) : '']);
+    });
+    downloadCsv(rows, 'tagsearch-tag');
+  }
+
+  function csvNote() {
+    var rows = [['升级项', '技能名', '技能ID', '英文名', '命中行号', '命中行内容', '注释总行数', '排除原因']];
+    S.note.result.hits.forEach(function (h) {
+      var hit = h.lines.filter(function (l) { return l.hit; });
+      rows.push([upNames(h.upgrades), h.name, h.id, h.en,
+        hit.map(function (l) { return 'L' + l.n; }).join(' '),
+        hit.map(function (l) { return l.t; }).join(' | '),
+        h.noteCount,
+        h.excluded ? (EXLABEL[h.excluded] || h.excluded) : '']);
+    });
+    downloadCsv(rows, 'tagsearch-note');
+  }
+
+  $('btnCsv').addEventListener('click', function () {
+    if (MODE === 'tag') { if (S.tag) csvTag(); }
+    else if (S.note) csvNote();
   });
 
   // ---------- 更新本地数据 ----------
@@ -663,6 +925,8 @@ td.upcell{white-space:normal;vertical-align:middle}
     $('mAbs').textContent = idx.excludedTotal
       ? (idx.abilities.length - idx.excludedTotal) + '（有效，共 ' + idx.abilities.length + '）'
       : idx.abilities.length;
+    var ns = core.noteStats(idx);
+    $('mNotes').textContent = ns.skills ? (ns.pool + ' 行 / ' + ns.skills + ' 技能') : '无';
   }
   function fillTagOptions() {
     dl.innerHTML = idx.names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
@@ -684,11 +948,15 @@ td.upcell{white-space:normal;vertical-align:middle}
   /** 载入一份新的 TAGDB：就地重建索引，界面立即生效 */
   function applyDb(db, src) {
     if (!db || !db.tags || !db.abilities) { ulog('数据格式不正确，已忽略', 'er'); return false; }
+    var hadTag = !!(S.tag && S.tag.query), hadNote = !!(S.note && S.note.query);
     window.TAGDB = db; DB = db; idx = core.createIndex(db);
+    S.tag = null; S.note = null;
     setMeta(); fillTagOptions(); revalidateAll(true);
     ulog('已载入数据：Tag ' + db.tags.length + ' 条 / 技能 ' + db.abilities.length +
       ' 条（' + (src || '未知来源') + '）', 'ok');
-    if (last) { ulog('按当前条件重新检索…', 'dim'); run(); }
+    if (MODE === 'tag' && hadTag) { ulog('按当前条件重新检索…', 'dim'); runTag(); }
+    else if (MODE === 'note' && hadNote) { ulog('按当前条件重新检索…', 'dim'); runNote(); }
+    else showEmpty();
     return true;
   }
 
@@ -856,11 +1124,17 @@ td.upcell{white-space:normal;vertical-align:middle}
   window.__tagsearch = {
     applyDb: applyDb, reloadDataJs: reloadDataJs, downloadDataJs: downloadDataJs,
     loadFromText: loadFromText, doUpdate: doUpdate,
+    setMode: setMode, runTag: runTag, runNote: runNote,
+    mode: function () { return MODE; },
+    searchNotes: function (q) { return core.searchNotes(idx, { q: q, includeExcluded: $('showExN').checked }); },
     info: function () {
+      var ns = core.noteStats(idx);
       return {
         tags: idx.db.tags.length, abilities: idx.abilities.length, fetchedAt: DB.fetchedAt,
         excludedTotal: idx.excludedTotal, excludedBy: idx.excludedBy,
-        includeExcluded: $('showEx').checked
+        includeExcluded: $('showEx').checked,
+        mode: MODE, notePool: ns.pool, noteSkills: ns.skills,
+        hasTag: !!S.tag, hasNote: !!S.note
       };
     }
   };
@@ -897,22 +1171,36 @@ td.upcell{white-space:normal;vertical-align:middle}
   document.querySelector('.side').addEventListener('input', updateExpr);
   document.querySelector('.side').addEventListener('click', function () { setTimeout(updateExpr, 0); });
 
-  $('btnRun').addEventListener('click', run);
+  $('btnRun').addEventListener('click', runTag);
   $('btnClear').addEventListener('click', function () {
     KINDS.forEach(function (k) { rowsOf(k).innerHTML = ''; addRow(k, true); });
     refreshAddBtns();
-    last = null; $('btnCsv').disabled = true; $('nHit').textContent = '0'; $('nScan').textContent = '';
-    $('tblbox').innerHTML = '<div class="empty">在左侧输入 tag 名称后点击「检索」</div>';
+    S.tag = null;
+    if (MODE === 'tag') showEmpty(); else $('btnCsv').disabled = !S.note;
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.list) { e.preventDefault(); run(); }
+    if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.list) { e.preventDefault(); runTag(); }
   });
   $('fuzzy').addEventListener('change', function () { revalidateAll(true); });
   // 「包含被排除项」勾选后立即用同一条件重跑（若已有检索结果）
-  $('showEx').addEventListener('change', function () { if (last) run(); });
+  $('showEx').addEventListener('change', function () { if (S.tag) runTag(); });
+
+  // ---------- 注释检索的交互 ----------
+  $('btnRunN').addEventListener('click', runNote);
+  $('noteQ').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runNote(); }
+  });
+  $('btnClearN').addEventListener('click', function () {
+    $('noteQ').value = '';
+    $('noteQ').focus();
+    S.note = null;
+    if (MODE === 'note') showEmpty(); else $('btnCsv').disabled = !S.tag;
+  });
+  $('showExN').addEventListener('change', function () { if (S.note) runNote(); });
 
   KINDS.forEach(function (k) { addRow(k, true); });
   updateExpr();
+  setMode('tag');
 })();
 </script>
 </body>

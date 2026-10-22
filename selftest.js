@@ -43,3 +43,38 @@ console.log('\n[技能特性内容] featText 覆盖 tag =', Object.keys(DB.featT
     (h.feats || []).forEach(function (f) { console.log('    · ' + h.id + ' ' + h.name + ' → [' + f.name + '] ' + f.text); });
   });
 });
+
+/* ---------- 注释检索（独立功能） ---------- */
+var ns = core.noteStats(idx);
+console.log('\n[注释检索] 行池 =', ns.pool, '，带注释技能 =', ns.skills);
+if (!ns.skills) {
+  console.log('  当前 data.js 不含注释 —— 需重新抓取后再验证（逻辑用合成数据自检）');
+  var sm = {
+    notePool: ['光环有0.1秒的粘滞时间。', '受到大于等于40点伤害后，一层屏障将被移除。'],
+    tags: [], abilities: [
+      { i: 1, n: '合成甲', d: [], g: [], m: [], e: [], nt: [0, 1], ni: [0, 1] },
+      { i: 2, n: '合成乙', d: [], g: [], m: [], e: [], nt: [0] }
+    ]
+  };
+  var six = core.createIndex(sm);
+  var sr = core.searchNotes(six, { q: '粘滞' });
+  console.log('  合成数据「粘滞」→', sr.hits.length, '条；',
+    '「粘滞 屏障」(AND) →', core.searchNotes(six, { q: '粘滞 屏障' }).hits.length, '条；',
+    '「粘滞 不存在」(AND) →', core.searchNotes(six, { q: '粘滞 不存在' }).hits.length, '条');
+  sr.hits.forEach(function (h) {
+    console.log('    · ' + h.name + ' 命中 ' + h.matched + '/' + h.noteCount + ' 行：' +
+      h.lines.filter(function (l) { return l.hit; }).map(function (l) { return 'L' + l.n + ' ' + l.t; }).join(' / '));
+  });
+} else {
+  ['粘滞', '伤害事件', '格挡'].forEach(function (q) {
+    var rn = core.searchNotes(idx, { q: q });
+    console.log('  「' + q + '」→ ' + rn.hits.length + ' 个技能');
+    rn.hits.slice(0, 2).forEach(function (h) {
+      var l = h.lines.filter(function (x) { return x.hit; })[0];
+      console.log('    · ' + h.id + ' ' + h.name + '  命中 ' + h.matched + '/' + h.noteCount +
+        ' 行｜L' + l.n + ' ' + l.t.slice(0, 50));
+    });
+  });
+  var multi = core.searchNotes(idx, { q: '粘滞 光环' });
+  console.log('  「粘滞 光环」(AND) → ' + multi.hits.length + ' 个技能');
+}

@@ -258,6 +258,126 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     window.__tagsearch.loadFromText('这不是数据', 'x.txt');
     ok(/无法识别文件内容/.test(doc.getElementById('updLog').textContent), '非法文件给出明确提示');
 
+    // ================= 注释检索（独立功能，与 Tag 检索互不影响） =================
+    const noteDb = {
+      fetchedAt: '2026-10-22T00:00:00.000Z',
+      tags: [{ id: 488, name: '治疗', c1: '机制', c2: '包含效果' }],
+      notePool: [
+        '光环有0.1秒的粘滞时间。',
+        '受到来自玩家及其控制的单位大于等于40点伤害后，一层屏障将被移除。',
+        '状态栏会显示当前的陵卫斗篷层数。'
+      ],
+      abilities: [
+        { i: 9101, n: '甲技能', en: 'alpha', d: [488], g: [], m: [], e: [], nt: [0, 1], ni: [0, 1] },
+        { i: 9102, n: '乙技能', en: 'beta', d: [], g: [], m: [], e: [], nt: [0] },
+        { i: 9103, n: '丙技能', en: 'gamma', d: [], g: [], m: [], e: [], nt: [2] },
+        { i: 9104, n: '丁技能', en: 'delta', d: [], g: [], m: [], e: [] }
+      ]
+    };
+    window.__tagsearch.applyDb(noteDb, '合成测试数据');
+    ok(/行 \/ 3 技能/.test(doc.getElementById('mNotes').textContent), '页头显示注释数据量（行池 / 技能数）',
+      doc.getElementById('mNotes').textContent);
+
+    // Tag 模式先留一份结果（用于验证「互不影响」）
+    const tagInp2 = doc.querySelector('.grp[data-k="and"] .rows input');
+    tagInp2.value = '治疗';
+    tagInp2.dispatchEvent(new window.Event('input', { bubbles: true }));
+    doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    const nTag = +doc.getElementById('nHit').textContent;
+    ok(nTag === 1, '合成数据下 Tag 检索命中 1', nTag);
+
+    // 切到注释模式
+    const mNote = doc.querySelector('#modes .mbtn[data-mode="note"]');
+    const mTag = doc.querySelector('#modes .mbtn[data-mode="tag"]');
+    ok(!!mNote && !!mTag, '页头存在「Tag 检索 / 注释检索」模式切换');
+    mNote.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(window.__tagsearch.mode() === 'note', '点击后进入注释模式');
+    ok(doc.getElementById('paneTag').style.display === 'none' &&
+      doc.getElementById('paneNote').style.display !== 'none', '同一时间只显示一种检索面板');
+    ok(mNote.classList.contains('on') && !mTag.classList.contains('on'), '模式按钮激活态随之切换');
+    ok(/要查找的注释内容/.test(doc.getElementById('tblbox').textContent), '注释模式空态提示与模式一致',
+      doc.getElementById('tblbox').textContent.trim());
+
+    // 检索
+    const q = doc.getElementById('noteQ');
+    ok(!!q, '存在注释输入框');
+    q.value = '粘滞';
+    doc.getElementById('btnRunN').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 2, '注释检索「粘滞」命中 2 个技能',
+      doc.getElementById('nHit').textContent);
+    const nThs = Array.prototype.map.call(doc.querySelectorAll('#tblbox thead th'), (t) => t.textContent);
+    ok(nThs[0] === '升级项' && /命中行/.test(nThs[3]), '注释模式表头为「升级项 / 技能 / ID / 命中行…」',
+      nThs.join(' / '));
+    ok(doc.querySelectorAll('#tblbox tbody .nline').length >= 2, '每行展示命中的注释原文行',
+      doc.querySelectorAll('#tblbox tbody .nline').length);
+    const marks = doc.querySelectorAll('#tblbox tbody mark');
+    ok(marks.length >= 2 && /粘滞/.test(marks[0].textContent), '命中关键词标黄', marks.length + ' 处');
+    ok(doc.querySelectorAll('#tblbox tbody .xmark').length === 0, '默认不含被排除项时无原因标记');
+    const cnt0 = doc.querySelector('#tblbox tbody td.count').textContent;
+    ok(/^\d+\/\d+$/.test(cnt0.trim()), '显示「命中行数 / 注释总行数」', cnt0);
+
+    // 多词 AND
+    q.value = '粘滞 层数';
+    doc.getElementById('btnRunN').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(doc.getElementById('nHit').textContent === '0', '空格分隔多词 = 需同时包含（AND）',
+      doc.getElementById('nHit').textContent);
+    q.value = '粘滞';
+    doc.getElementById('btnRunN').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    // 详情：完整注释 + 命中行高亮（按技能名定位行，排序为命中数优先，不假定行序）
+    const rowOf = (nm) => Array.prototype.find.call(
+      doc.querySelectorAll('#tblbox tbody tr'),
+      (tr) => ((tr.querySelector('td.nm') || {}).textContent || '').indexOf(nm) >= 0);
+    const rowA = rowOf('甲技能');
+    ok(!!rowA, '列表中能找到「甲技能」（2 行注释、命中 1 行）');
+    rowA.querySelector('[data-detail]').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(doc.getElementById('mask').classList.contains('on'), '注释模式点「详情」可打开弹窗');
+    const allLis = doc.querySelectorAll('#mBody .noteall li');
+    ok(allLis.length === 2, '详情展示该技能全部注释行', allLis.length);
+    ok(doc.querySelectorAll('#mBody .noteall li.hit').length === 1, '详情内命中行带高亮类',
+      doc.querySelectorAll('#mBody .noteall li.hit').length);
+    ok(/L1/.test(allLis[0].textContent) && /L2/.test(allLis[1].textContent), '详情逐行给出行号（L1 / L2）');
+    ok(allLis[1].style.paddingLeft === '14px', '缩进层级体现在行内边距', allLis[1].style.paddingLeft || '(无)');
+    doc.getElementById('mClose').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    // 简洁模式（注释模式共用简/详）
+    btnView.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(doc.querySelectorAll('#tblbox .cmpgrid').length === 1 &&
+      doc.querySelectorAll('#tblbox .nline').length === 0, '注释模式也支持简洁展示（仅图标 + 技能名）');
+    ok(doc.querySelectorAll('#tblbox .cmpgrid .cname').length === 2, '简洁模式列出全部命中技能',
+      doc.querySelectorAll('#tblbox .cmpgrid .cname').length);
+    btnView.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(doc.querySelectorAll('#tblbox tbody .nline').length > 0, '切回详细后注释命中行恢复');
+
+    // 互不影响：切回 Tag 模式应还原之前的 Tag 结果
+    mTag.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === nTag, '切回 Tag 模式还原原结果（不受注释检索影响）',
+      doc.getElementById('nHit').textContent + ' vs ' + nTag);
+    const tThs = Array.prototype.map.call(doc.querySelectorAll('#tblbox thead th'), (t) => t.textContent);
+    ok(/命中详情/.test(tThs[3]), 'Tag 模式表头仍为「命中详情」', tThs.join(' / '));
+    ok(doc.querySelectorAll('#tblbox .nline').length === 0, 'Tag 模式不残留注释行');
+
+    mNote.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 2, '再切回注释模式还原注释结果',
+      doc.getElementById('nHit').textContent);
+
+    // 清空
+    doc.getElementById('btnClearN').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(q.value === '' && +doc.getElementById('nHit').textContent === 0, '注释「清空」清掉输入与结果');
+    doc.getElementById('btnRunN').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(/请输入要查找的注释内容/.test(doc.getElementById('tblbox').textContent), '空输入时给出提示');
+
+    // 旧快照（无 notePool）→ 明确提示
+    window.__tagsearch.applyDb({
+      fetchedAt: '', tags: noteDb.tags,
+      abilities: [{ i: 9201, n: '无注释技能', en: 'x', d: [], g: [], m: [], e: [] }]
+    }, '旧快照');
+    mNote.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(/不含注释内容/.test(doc.getElementById('noteWarn').textContent), '数据无注释时提示重新抓取',
+      doc.getElementById('noteWarn').textContent.trim().slice(0, 30));
+    ok(doc.getElementById('mNotes').textContent === '无', '页头注释数显示「无」',
+      doc.getElementById('mNotes').textContent);
+
     console.log(fails ? `\n${fails} 项失败` : '\n全部通过');
     process.exit(fails ? 1 : 0);
   })
