@@ -54,8 +54,25 @@ def find_bash() -> str | None:
 
 
 def _bsk_exe() -> str:
-    """bsk 可执行文件：优先环境变量，其次 PATH（browser-skill CLI）"""
-    return os.environ.get('BSK_EXE') or shutil.which('bsk') or shutil.which('bsk.exe') or 'bsk'
+    """bsk 可执行文件：环境变量 → PATH → 常见安装位置（browser-skill CLI）
+
+    ⚠️ Windows 上 bsk 常装在 `~/.local/bin/`，不在 PATH 里；只查 PATH 会误报
+    「未找到 bsk CLI」，导致页面「更新本地数据」直接失败。
+    """
+    cands = [os.environ.get('BSK_EXE') or '',
+             shutil.which('bsk') or '',
+             shutil.which('bsk.exe') or '']
+    home = os.path.expanduser('~')
+    local = os.environ.get('LOCALAPPDATA') or os.path.join(home, 'AppData', 'Local')
+    for d in (os.path.join(home, '.local', 'bin'),
+              os.path.join(local, 'Programs', 'browser-skill'),
+              os.path.join(local, 'bin')):
+        cands.append(os.path.join(d, 'bsk.exe'))
+        cands.append(os.path.join(d, 'bsk'))
+    for c in cands:
+        if c and os.path.isfile(c):
+            return c
+    return 'bsk'
 
 
 def daemon_state() -> dict:
@@ -70,7 +87,8 @@ def daemon_state() -> dict:
     except Exception as e:                                   # noqa: BLE001
         return {'ok': False, 'why': 'bsk status 调用失败：%s' % e}
     if p.returncode != 0:
-        return {'ok': False, 'why': 'bsk daemon 未运行（请先启动 daemon）'}
+        return {'ok': False, 'why': 'bsk daemon 未运行 —— 先在终端执行：'
+                                    '"%s" daemon start --foreground --port 52810' % exe}
     try:
         j = json.loads(p.stdout.decode('utf-8', 'replace'))
     except Exception:                                        # noqa: BLE001
@@ -115,6 +133,10 @@ def refresh() -> dict:
         say('调用 refresh.sh（导航到技能页 → 页面内抓取 → 重建 data.js）…')
         env = dict(os.environ)
         env['BSK_AUTO_START'] = '0'
+        env['BSK_EXE'] = _bsk_exe()          # 子进程（bash）里通常找不到 bsk，父进程定位后显式传入
+        env.setdefault('PYTHON', sys.executable)
+        for k in ('HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy'):
+            env.pop(k, None)                 # 环境注入的代理会让 bsk 连不上本机 daemon
         p = subprocess.run([bash, 'refresh.sh'], cwd=ROOT, capture_output=True,
                            timeout=600, env=env)
         out = (p.stdout or b'').decode('utf-8', 'replace')

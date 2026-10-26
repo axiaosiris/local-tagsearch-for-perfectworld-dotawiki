@@ -56,6 +56,10 @@ class NoteParser(HTMLParser):
     def _flush(self):
         s = ''.join(self._buf)
         s = s.replace('\xa0', ' ')
+        # Quill 会在行尾残留 U+FEFF（零宽无断字符，来自 <span class="ql-cursor">），
+        # 必须显式删除：Python 的 \s 不匹配它，而 JS 的 \s 匹配 —— 不统一会让
+        # build_data.py 与 index.html 内建构建（书签抓取的 _raw.json 走这条）产出不一致。
+        s = s.replace('\ufeff', '')
         s = re.sub(r'\s+', ' ', s).strip()
         if s:
             self.lines.append({'ind': self._ind, 'text': s})

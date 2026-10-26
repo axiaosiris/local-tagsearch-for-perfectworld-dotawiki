@@ -514,115 +514,86 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
       doc.getElementById('nHit').textContent);
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
 
-    // ================= 英雄筛选（勾选英雄 = 只看这些英雄的技能） =================
-    const heroDb = {
-      fetchedAt: '2026-10-22T00:00:00.000Z',
+    // ================= 技能筛选（按数据来源；目前只有「现版本英雄技能」） =================
+    const srcDb = {
+      fetchedAt: '2026-10-26T00:00:00.000Z',
       tags: [{ id: 488, name: '治疗', c1: '机制', c2: '包含效果' }],
       notePool: ['光环有0.1秒的粘滞时间。'],
-      heroes: [
-        { i: 10, zh: '甲英雄', en: 'alpha', a: '力量' },
-        { i: 11, zh: '乙英雄', en: 'beta', a: '敏捷' },
-        { i: 12, zh: '丙英雄', en: 'gamma', a: '智力' }
-      ],
+      heroes: [{ i: 10, zh: '甲英雄', en: 'alpha', a: '力量' }],
       abilities: [
         { i: 9401, n: '甲一', en: 'alpha_one', d: [488], g: [], m: [], e: [], nt: [0], h: [10] },
-        { i: 9402, n: '甲二', en: 'alpha_two', d: [488], g: [], m: [], e: [], h: [10] },
-        { i: 9403, n: '乙一', en: 'beta_one', d: [488], g: [], m: [], e: [], h: [11], nt: [0] },
-        { i: 9404, n: '无归属', en: 'orphan', d: [488], g: [], m: [], e: [] }
+        { i: 9402, n: '甲二', en: 'alpha_two', d: [488], g: [], m: [], e: [], h: [10] }
       ]
     };
-    window.__tagsearch.applyDb(heroDb, '合成测试数据（英雄）');
+    window.__tagsearch.applyDb(srcDb, '合成测试数据（来源）');
     mTag.dispatchEvent(new window.Event('click', { bubbles: true }));
-    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));  // 清掉上一组测试留下的前摇区间
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
 
-    const heroGrid = doc.getElementById('heroGrid');
-    const heroBody = doc.getElementById('heroBody');
-    ok(!!doc.getElementById('paneHero') && !!heroGrid, '左栏存在「英雄筛选」卡片');
-    ok(/名册 3/.test(doc.getElementById('mHero').textContent), '页头显示英雄名册数',
-      doc.getElementById('mHero').textContent);
-    ok(heroBody.style.display === 'none', '英雄名册默认收起（不占版面）');
-    doc.getElementById('heroToggle').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(heroBody.style.display !== 'none', '点「展开」后显示名册');
-    const chips = () => Array.prototype.slice.call(heroGrid.querySelectorAll('.hchip'));
-    ok(chips().length === 2, '只列出有技能记录的英雄（0 技能的「丙英雄」不出现）', chips().length);
-    ok(chips().every((c) => !!c.querySelector('.dot')), '每个英雄带主属性色点');
-    ok(/全部英雄（2）/.test(doc.getElementById('heroSum').textContent), '未勾选时摘要为「全部英雄」',
-      doc.getElementById('heroSum').textContent);
+    const srcList = doc.getElementById('srcList');
+    const sChips = () => Array.prototype.slice.call(srcList.querySelectorAll('.schip'));
+    const srcCb = (re) => {
+      const c = sChips().filter((x) => re.test(x.textContent))[0];
+      return c ? c.querySelector('input') : null;
+    };
+    ok(!!doc.getElementById('paneSrc'), '左栏存在「技能筛选」卡片');
+    ok(!doc.getElementById('paneHero') && !doc.getElementById('heroGrid'),
+      '原「英雄筛选」卡片与英雄网格已移除');
+    ok(sChips().length === 1, '只列出已接入的来源（1 类）', sChips().length);
+    ok(/现版本英雄技能/.test(sChips()[0].textContent), '来源选项为「现版本英雄技能」',
+      sChips()[0].textContent.trim());
+    ok(sChips()[0].querySelector('input').checked, '「现版本英雄技能」默认勾选');
+    ok(/全部来源/.test(doc.getElementById('srcSum').textContent), '摘要显示「全部来源」',
+      doc.getElementById('srcSum').textContent);
+    ok(/2 条/.test(sChips()[0].textContent), '来源右侧显示技能条数', sChips()[0].textContent.trim());
 
-    // 勾选「甲英雄」→ 只留该英雄的技能
     const tagInp4 = doc.querySelector('.grp[data-k="and"] .rows input');
     tagInp4.value = '治疗';
     tagInp4.dispatchEvent(new window.Event('input', { bubbles: true }));
     doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(+doc.getElementById('nHit').textContent === 4, '未勾选英雄时命中 4 条（全库）',
-      doc.getElementById('nHit').textContent);
+    ok(+doc.getElementById('nHit').textContent === 2, '默认来源下命中 2 条', doc.getElementById('nHit').textContent);
 
-    const cbA = heroGrid.querySelector('.hchip input[value="10"]');
-    cbA.checked = true;
-    cbA.dispatchEvent(new window.Event('change', { bubbles: true }));
-    ok(heroGrid.querySelector('.hchip input[value="10"]').closest('.hchip').classList.contains('on'),
-      '勾选后 chip 高亮');
-    ok(+doc.getElementById('nHit').textContent === 2, '勾选英雄后立即按英雄重筛（甲英雄 2 条）',
+    // 全部取消勾选 → 拦住、不出结果
+    let cbSrc = srcCb(/现版本英雄技能/);
+    cbSrc.checked = false;
+    cbSrc.dispatchEvent(new window.Event('change', { bubbles: true }));
+    ok(/至少勾选一类「技能来源」/.test(doc.getElementById('tblbox').textContent),
+      '全不勾来源时提示至少勾选一类');
+    ok(/未选来源/.test(doc.getElementById('srcSum').textContent), '摘要显示「未选来源」',
+      doc.getElementById('srcSum').textContent);
+    ok(doc.getElementById('btnCsv').disabled, '无来源时导出按钮禁用');
+
+    cbSrc = srcCb(/现版本英雄技能/);
+    cbSrc.checked = true;
+    cbSrc.dispatchEvent(new window.Event('change', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 2, '重新勾上后恢复结果', doc.getElementById('nHit').textContent);
+
+    // 数据里出现第二类来源（模拟接入物品技能）→ 自动多出勾选项，且默认不勾
+    window.__tagsearch.applyDb({
+      fetchedAt: srcDb.fetchedAt, tags: srcDb.tags, notePool: srcDb.notePool, heroes: srcDb.heroes,
+      abilities: srcDb.abilities.concat([
+        { i: 9403, n: '物品一', en: 'item_one', src: 'item', d: [488], g: [], m: [], e: [], nt: [0] }
+      ])
+    }, '含物品技能');
+    ok(sChips().length === 2, '数据里出现新来源时自动多出勾选项', sChips().length);
+    const itemCb = srcCb(/物品技能/);
+    ok(!!itemCb && !itemCb.checked, '尚未接入完成的来源默认不勾选');
+    ok(/已选 1 \/ 2 类/.test(doc.getElementById('srcSum').textContent), '摘要反映「已选 1 / 2 类」',
+      doc.getElementById('srcSum').textContent);
+
+    itemCb.checked = true;
+    itemCb.dispatchEvent(new window.Event('change', { bubbles: true }));
+    let heroCb = srcCb(/现版本英雄技能/);
+    heroCb.checked = false;
+    heroCb.dispatchEvent(new window.Event('change', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 1, '只剩物品技能来源时命中 1 条',
       doc.getElementById('nHit').textContent);
-    ok(/已按英雄筛选/.test(doc.getElementById('tblbox').textContent), '结果区提示按英雄筛选');
-    ok(!/乙一/.test(doc.getElementById('tblbox').textContent) && !/无归属/.test(doc.getElementById('tblbox').textContent),
-      '其他英雄与无归属条目被排除');
-    const hrCell = doc.querySelector('#tblbox tbody td.nm .hr');
-    ok(!!hrCell && /甲英雄/.test(hrCell.textContent), '结果表技能列下显示所属英雄', hrCell && hrCell.textContent);
-    ok(/英雄/.test(doc.getElementById('expr').textContent), '「当前条件」表达式包含英雄条件',
+    ok(/已按技能来源筛选/.test(doc.getElementById('tblbox').textContent), '只勾部分来源时结果区给出说明');
+    ok(/来源/.test(doc.getElementById('expr').textContent), '「当前条件」表达式包含来源条件',
       doc.getElementById('expr').textContent.trim());
 
-    // 详情弹窗含「所属英雄」
-    doc.querySelector('#tblbox tbody [data-detail]').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(/所属英雄/.test(doc.getElementById('mBody').textContent), '技能详情含「所属英雄」段');
-    doc.getElementById('mClose').dispatchEvent(new window.Event('click', { bubbles: true }));
-
-    // 清空 / 全选 / 反选
-    doc.getElementById('heroNone').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(+doc.getElementById('nHit').textContent === 4, '「清空」英雄勾选后恢复全库命中',
-      doc.getElementById('nHit').textContent);
-    doc.getElementById('heroAll').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(+doc.getElementById('nHit').textContent === 3, '「全选」= 甲乙两英雄的并集（3 条，无归属仍排除）',
-      doc.getElementById('nHit').textContent);
-    doc.getElementById('heroInv').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(+doc.getElementById('nHit').textContent === 4, '「反选」后全部取消 → 回到全库',
-      doc.getElementById('nHit').textContent);
-
-    // 搜索框过滤 + 只对可见项操作
-    const heroQ = doc.getElementById('heroQ');
-    heroQ.value = 'beta';
-    heroQ.dispatchEvent(new window.Event('input', { bubbles: true }));
-    ok(chips().length === 1 && /乙英雄/.test(chips()[0].textContent), '搜索框按中文/英文过滤英雄',
-      chips().map((c) => c.textContent.trim()).join('/'));
-    doc.getElementById('heroAll').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(+doc.getElementById('nHit').textContent === 1, '「全选」只作用于当前搜索到的英雄（乙英雄 1 条）',
-      doc.getElementById('nHit').textContent);
-    heroQ.value = '';
-    heroQ.dispatchEvent(new window.Event('input', { bubbles: true }));
-    ok(chips().length === 2, '清空搜索框后恢复完整名册');
-
-    // 与注释检索共用：注释模式同样受英雄筛选影响
-    mNote.dispatchEvent(new window.Event('click', { bubbles: true }));
-    const noteQ2 = doc.getElementById('noteQ');
-    noteQ2.value = '粘滞';
-    doc.getElementById('btnRunN').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(+doc.getElementById('nHit').textContent === 1 &&
-      /乙一/.test(doc.getElementById('tblbox').textContent), '注释检索同样按英雄筛选（只剩乙一）',
-      doc.getElementById('nHit').textContent);
-    ok(/已按英雄筛选/.test(doc.getElementById('tblbox').textContent), '注释模式同样提示按英雄筛选');
-    mTag.dispatchEvent(new window.Event('click', { bubbles: true }));
-    doc.getElementById('heroNone').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(+doc.getElementById('nHit').textContent === 4, '取消英雄勾选后 Tag 结果恢复',
-      doc.getElementById('nHit').textContent);
-
-    // 旧快照（无 heroes）→ 名册给出提示
-    window.__tagsearch.applyDb({
-      fetchedAt: '', tags: heroDb.tags,
-      abilities: [{ i: 9501, n: '无英雄技能', en: 'x', d: [488], g: [], m: [], e: [] }]
-    }, '旧快照');
-    ok(/不含英雄名册/.test(heroGrid.textContent), '数据无英雄名册时给出重新抓取提示',
-      heroGrid.textContent.trim().slice(0, 24));
-    ok(doc.getElementById('mHero').textContent === '无', '页头英雄数显示「无」', doc.getElementById('mHero').textContent);
+    ok(typeof window.__tagsearch.setSources === 'function' &&
+       typeof window.__tagsearch.setHeroes === 'function' &&
+       typeof window.__tagsearch.sources === 'function', '自动化钩子保留 setSources / setHeroes / sources');
 
     console.log(fails ? `\n${fails} 项失败` : '\n全部通过');
     process.exit(fails ? 1 : 0);

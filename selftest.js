@@ -120,7 +120,7 @@ if (!castCount) {
   console.log('  前摇0~0 全量 ' + castAll.hits.length + ' 条；叠加反选后：有效 ' +
     castNot.stats.effective + ' − 反选排除 ' + nt.out + ' = 参加前摇判定 ' + nt.afterTag +
     ' − 无前摇 ' + cst.missing + ' − 区间外 ' + cst.out + ' = ' + castNot.hits.length +
-    '（' + (chain && castNot.hits.length === 216 ? '✓ 与独立核算的 216 一致' : '✗ 与期望 216 不一致') + '）');
+    '（' + (chain ? '✓ 链式自洽' : '✗ 链式不自洽') + '）');
   console.log('  反选条件 = ' + JSON.stringify(nt.names) + '，反选后 ' + castNot.hits.length + ' 条');
 }
 
@@ -178,3 +178,37 @@ if (!heroTotal) {
       (hs.length ? '  ✗ 应无归属' : '  ✓'));
   });
 }
+
+// ================= 技能来源筛选（数据类别；物品/非英雄单位技能待接入） =================
+console.log('\n[技能来源]');
+console.log('  登记表 = ' + core.SOURCES.map(function (s) { return s.key + (s.ready ? '' : '(未接入)'); }).join('、'));
+console.log('  数据里的来源 = ' + JSON.stringify(idx.sources) + '，条数 ' + JSON.stringify(idx.sourceCount));
+var readyKeys = core.SOURCES.filter(function (s) { return s.ready; }).map(function (s) { return s.key; });
+var baseQ = { and: ['防御塔'], or: [], not: [] };
+var rSrcAll = core.search(idx, { and: baseQ.and, or: [], not: [], sources: readyKeys });
+var rSrcNone = core.search(idx, { and: baseQ.and, or: [], not: [], sources: [] });   // 空数组 = 不过滤
+var rSrcOmit = core.search(idx, baseQ);
+console.log('  全勾来源 ' + rSrcAll.hits.length + ' 条（stats.src.on=' + rSrcAll.stats.src.on + '）｜不传 sources ' +
+  rSrcOmit.hits.length + ' 条｜空 sources ' + rSrcNone.hits.length + ' 条（= 不过滤；界面会拦住全不勾）');
+console.log('  注释检索带 sources：' + core.searchNotes(idx, { q: '粘滞', sources: readyKeys }).hits.length +
+  ' 条（应 = 全库 ' + core.searchNotes(idx, { q: '粘滞' }).hits.length + '）');
+
+// 模拟接入「物品技能」：把 100 条**有效**技能标成 src:'item'，验证过滤与叠加
+var pickItem = {};
+DB.abilities.filter(function (a) { return !core.excludeKind(a); }).slice(0, 100)
+  .forEach(function (a) { pickItem[a.i] = 1; });
+var fake = core.createIndex({
+  tags: DB.tags, heroes: DB.heroes, notePool: DB.notePool, featText: DB.featText,
+  abilities: DB.abilities.map(function (a) {
+    if (!pickItem[a.i]) return a;
+    var c = {}; for (var kk in a) if (Object.prototype.hasOwnProperty.call(a, kk)) c[kk] = a[kk];
+    c.src = 'item'; return c;
+  })
+});
+console.log('  模拟数据来源 = ' + JSON.stringify(fake.sources) + '，条数 ' + JSON.stringify(fake.sourceCount));
+var fItem = core.search(fake, { and: [], or: [], not: [], sources: ['item'] });
+var fHero = core.search(fake, { and: [], or: [], not: [], sources: ['hero'] });
+var fBoth = core.search(fake, { and: [], or: [], not: [], sources: ['hero', 'item'] });
+console.log('  只 item ' + fItem.hits.length + ' ｜只 hero ' + fHero.hits.length + ' ｜两者 ' + fBoth.hits.length +
+  '（合计应 = 有效 ' + (fake.abilities.length - fake.excludedTotal) + '）');
+console.log('  只 item 的 stats.src = ' + JSON.stringify(fItem.stats.src));

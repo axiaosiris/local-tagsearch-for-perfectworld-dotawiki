@@ -18,6 +18,10 @@
  *         构建阶段**只取**该英雄的 ability_map（即英雄数据页「人工处理数据 → 技能」列表），
  *         不做英文名推断；技能总表里残留的旧版本技能/废弃天赋登记不到任何英雄，
  *         启用英雄筛选时不会被命中（统计在 stats.hero.out）。
+ *   sources: [来源 key…] 技能来源筛选（数据类别，见下方 SOURCES 登记表）——只保留所选来源的
+ *         技能（并集）。技能侧来源看 a.src，**缺省视为 'hero'**（现版本英雄技能），故旧数据
+ *         不写 src 即全部归入英雄技能。今后并入物品技能 / 非英雄单位技能时给技能写 src 即可。
+ *         未勾选任何来源 = 不过滤（界面会拦住）；只勾了部分来源时统计在 stats.src.out。
  * 同名 tag 可能存在于多个档位（如「友方防御塔」有 目标/神杖/魔晶/天赋 四档）→ 命中任一档即算包含。
  * 技能特性（skill_mechanism）除词条外还有「特性内容」（mechanism_input）：
  *   数据侧池化为 featText = {tagId:[文本…]}，技能侧 f = 与 m 同序的池下标，
@@ -50,6 +54,56 @@
     if (n.indexOf('-{') === 0) return 'junk';
     if (a.i >= CUSTOM_ID_MIN) return 'custom';
     return null;
+  }
+
+  /* ---------- 技能来源（数据类别）----------
+   * 检索库今后不只有英雄技能：物品技能、非英雄单位技能等会陆续并入同一份数据。
+   * 约定：技能对象用 src 字段标注来源，**缺省（无 src）= 'hero'**，所以现有 data.js
+   * 无需改造就全部算「现版本英雄技能」。新增一类来源只需两步：
+   *   ① 在本登记表加一行、把 ready 改为 true（界面按此表自动渲染勾选项）；
+   *   ② 构建阶段给该来源的技能写入 src（build_data.py）。
+   * ready:false 的条目只是占位，界面不显示。 */
+  var SOURCES = [
+    { key: 'hero', label: '现版本英雄技能', ready: true,
+      tip: '后台「英雄数据 → 人工处理数据 → 技能」的现版本技能（含技能总表里残留的旧版本条目）' },
+    { key: 'item', label: '物品技能', ready: false,
+      tip: '物品附带的技能（如散华、赤红甲的主动）——数据尚未接入' },
+    { key: 'creep', label: '非英雄单位技能', ready: false,
+      tip: '野怪 / 小兵 / 召唤物 / Boss 的技能——数据尚未接入' }
+  ];
+  var SRC_DEFAULT = 'hero';
+
+  /** 某技能的来源 key（无 src 字段 = 英雄技能） */
+  function srcOf(a) { return String((a && a.src) || SRC_DEFAULT); }
+
+  /** 归一化来源 key 数组（去空、去重） */
+  function normSources(list) {
+    var out = [];
+    (list || []).forEach(function (v) {
+      var k = String(v == null ? '' : v).trim();
+      if (k && out.indexOf(k) < 0) out.push(k);
+    });
+    return out;
+  }
+
+  /** 该技能是否属于所选来源之一 */
+  function hasSource(a, srcSet) { return srcSet.has(srcOf(a)); }
+
+  function sourcePoolSize(index, srcSet) {
+    if (!srcSet || !srcSet.size) return 0;
+    var n = 0;
+    (index.abilities || []).forEach(function (a) { if (hasSource(a, srcSet)) n++; });
+    return n;
+  }
+
+  /** 统一构造 stats.src：on = 确实缩小了范围（只勾了数据里的部分来源） */
+  function sourceStats(index, keys, out) {
+    var all = (index && index.sources) || [];
+    var on = keys.length > 0 && all.some(function (k) { return keys.indexOf(k) < 0; });
+    return {
+      on: !!on, keys: keys.slice(), all: all.slice(), out: out || 0,
+      pool: sourcePoolSize(index, new Set(keys))
+    };
   }
 
   function createIndex(db) {
@@ -86,6 +140,15 @@
         if (!bad) heroSkillsValid.set(id, (heroSkillsValid.get(id) || 0) + 1);
       });
     });
+    /* 技能来源（数据类别）：a.src，缺省 = 'hero' */
+    var sources = [];                        // 数据里实际出现的来源 key（按出现顺序）
+    var sourceCount = {};                    // 来源 → 技能条数（含被排除项）
+    abilities.forEach(function (a) {
+      var k = srcOf(a);
+      if (sources.indexOf(k) < 0) sources.push(k);
+      sourceCount[k] = (sourceCount[k] || 0) + 1;
+    });
+
     return {
       db: db,
       id2tag: id2tag,
@@ -94,6 +157,8 @@
       abilities: abilities,
       featText: db.featText || {},
       notePool: db.notePool || [],
+      sources: sources,
+      sourceCount: sourceCount,
       heroes: heroes,
       id2hero: id2hero,
       heroSkills: heroSkills,
@@ -182,6 +247,10 @@
       .map(function (s) { return s.trim(); }).filter(Boolean);
     var lows = terms.map(function (s) { return s.toLowerCase(); });
     var showExcluded = !!query.includeExcluded;
+    var srcKeys = normSources(query.sources);
+    var srcOn = srcKeys.length > 0;
+    var srcSet = new Set(srcKeys);
+    var srcOut = 0;
     var heroIds = normHeroIds(query.heroes);
     var heroOn = heroIds.length > 0;
     var heroSet = new Set(heroIds);
@@ -200,7 +269,8 @@
         effective: index.abilities.length - (index.excludedTotal || 0),
         includeExcluded: showExcluded,
         noteSkills: noteStats(index).skills,
-        hero: heroStats(index, heroOn, heroIds, 0)
+        hero: heroStats(index, heroOn, heroIds, 0),
+        src: sourceStats(index, srcKeys, 0)
       }
     };
     if (!lows.length) return base;
@@ -208,6 +278,7 @@
     index.abilities.forEach(function (a) {
       var ex = excludeKind(a);
       if (ex && !showExcluded) { skipped++; return; }
+      if (srcOn && !hasSource(a, srcSet)) { srcOut++; return; }
       if (heroOn && !hasHero(a, heroSet)) { heroOut++; return; }
       var lines = noteLines(index, a);
       if (!lines.length) return;
@@ -238,6 +309,7 @@
     });
     base.stats.skipped = skipped;
     base.stats.hero = heroStats(index, heroOn, heroIds, heroOut);
+    base.stats.src = sourceStats(index, srcKeys, srcOut);
     return base;
   }
 
@@ -438,6 +510,12 @@
     var castMax = castOn && cast.max != null && cast.max !== '' && !isNaN(cast.max) ? Number(cast.max) : null;
     var castMissing = 0, castOut = 0;
 
+    // 技能来源筛选（可选，先于英雄筛选，两者可叠加）
+    var srcKeys = normSources(query.sources);
+    var srcOn = srcKeys.length > 0;
+    var srcSet = new Set(srcKeys);
+    var srcOut = 0;
+
     // 英雄筛选（可选，与 tag / 前摇条件同时生效）
     var heroIds = normHeroIds(query.heroes);
     var heroOn = heroIds.length > 0;
@@ -449,6 +527,7 @@
     index.abilities.forEach(function (a) {
       var ex = excludeKind(a);
       if (ex && !showExcluded) { skipped++; return; }
+      if (srcOn && !hasSource(a, srcSet)) { srcOut++; return; }
       if (heroOn && !hasHero(a, heroSet)) { heroOut++; return; }
       var set = tagSet(a, scope);
       var i;
@@ -508,7 +587,8 @@
         includeExcluded: showExcluded,
         cast: { on: castOn, min: castMin, max: castMax, missing: castMissing, out: castOut },
         not: { on: notIds.length > 0, out: notOut, afterTag: afterTag, names: rNot.map(function (r) { return r && r.input || ''; }) },
-        hero: heroStats(index, heroOn, heroIds, heroOut)
+        hero: heroStats(index, heroOn, heroIds, heroOut),
+        src: sourceStats(index, srcKeys, srcOut)
       }
     };
   }
@@ -551,6 +631,11 @@
     heroesOf: heroesOf,
     normHeroIds: normHeroIds,
     hasHero: hasHero,
+    SOURCES: SOURCES,
+    srcOf: srcOf,
+    normSources: normSources,
+    hasSource: hasSource,
+    sourceStats: sourceStats,
     featsOf: featsOf,
     featTexts: featTexts,
     EXCLUDE_KINDS: EXCLUDE_KINDS,

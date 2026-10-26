@@ -135,6 +135,7 @@ tr.ex td.nm{font-style:italic}
 .expr .p.and{background:var(--and)} .expr .p.or{background:var(--or)} .expr .p.not{background:var(--not)}
 .expr .p.cp{background:#7c8fa6}
 .expr .p.hp{background:#8e7cc3}
+.expr .p.src{background:#0f9d58}
 .expr .join{font-weight:700;color:var(--sub);margin:0 5px}
 .expr code{background:#fff;border:1px solid var(--line);border-radius:4px;padding:0 4px;
   font:11.5px/1.6 ui-monospace,Consolas,Menlo,monospace}
@@ -190,6 +191,19 @@ td.upcell{white-space:normal;vertical-align:middle}
 .svcline input:focus{border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-bg)}
 .st{font-size:12px;color:var(--sub)}
 .st .g{color:#0f9d58;font-weight:600} .st .r{color:var(--not);font-weight:600}
+/* ---------- 更新弹窗分区 ---------- */
+.updsec{border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-bottom:12px;background:#fcfdff}
+.updsec>h4{margin:0 0 6px;font-size:13.5px;color:#33345a;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.updsec>h4 .tagm{font-size:11px;font-weight:400;color:var(--sub);border:1px solid var(--line);
+  border-radius:20px;padding:0 7px;background:#fff}
+.updsec.dim{background:#fafbfd}
+.steps{margin:8px 0 0;padding-left:20px;font-size:12.5px;color:var(--sub);line-height:1.85}
+.steps b{color:var(--text)}
+.steps code{background:#fff;border:1px solid var(--line);border-radius:4px;padding:0 4px}
+details.mk{border:1px solid var(--line);border-radius:9px;background:#fafbfd;padding:9px 12px;margin-bottom:10px}
+details.mk>summary{cursor:pointer;font-size:13px;color:#33345a;font-weight:600;outline:none}
+details.mk[open]>summary{margin-bottom:8px}
+.mkb{display:inline-block;text-decoration:none;cursor:grab}
 /* ---------- 模式切换（Tag 检索 / 注释检索，同一时间只展示一种） ---------- */
 .modes{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#f7f9fc}
 .mbtn{border:0;background:transparent;padding:5px 14px;font:13px/1.5 inherit;color:#4a5568;cursor:pointer}
@@ -212,26 +226,21 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
 .tblbox table.noteTbl{min-width:700px;table-layout:fixed}
 .nline{word-break:break-word}
 .noteTbl td:last-child{white-space:nowrap;padding-left:4px;padding-right:6px}
-/* 英雄筛选 */
+/* 技能筛选（按数据来源；目前只有英雄技能，物品/非英雄单位技能待接入） */
 .hdright{display:flex;align-items:center;gap:8px}
 .hdright .tip{margin:0}
-.herorow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.herorow input{flex:1;min-width:110px;padding:5px 8px;font:13px/1.4 inherit;color:var(--text);
-  border:1px solid var(--line);border-radius:7px;background:#fff;outline:none}
-.herorow input:focus{border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-bg)}
-.herorow .btn.link{font-size:12px;padding:2px 5px}
-.herogrid{display:flex;flex-wrap:wrap;gap:5px;max-height:236px;overflow:auto;padding:8px 7px;
-  border:1px solid var(--line);border-radius:8px;background:#fdfefe;margin:8px 0}
-.hchip{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;line-height:1.6;
-  padding:1px 7px 1px 5px;border:1px solid var(--line);border-radius:6px;cursor:pointer;
-  background:#fbfcfe;user-select:none;white-space:nowrap}
-.hchip:hover{border-color:#cfd6e0;background:#f6f9fe}
-.hchip.on{background:var(--pri-bg);border-color:#bcd3fb;color:#1f57c9;font-weight:600}
-.hchip input{margin:0;width:13px;height:13px;flex:none;cursor:pointer}
-.hchip .dot{width:6px;height:6px;border-radius:50%;flex:none}
-.dot.a-str{background:#c0392b}.dot.a-agi{background:#1f9d55}.dot.a-int{background:#2f80ed}.dot.a-uni{background:#8e7cc3}
+.srclist{display:flex;flex-direction:column;gap:6px}
+.schip{display:flex;align-items:center;gap:7px;font-size:13px;line-height:1.6;
+  padding:7px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;
+  background:#fbfcfe;user-select:none}
+.schip:hover{border-color:#cfd6e0;background:#f6f9fe}
+.schip.on{background:var(--pri-bg);border-color:#bcd3fb;color:#1f57c9;font-weight:600}
+.schip input{margin:0;width:14px;height:14px;flex:none;cursor:pointer}
+.schip .cnt{margin-left:auto;font-size:11.5px;font-weight:400;color:var(--sub);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.schip.on .cnt{color:#4a7fd4}
+.schip.off{opacity:.55}
 td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
-.heroEmpty{padding:10px;text-align:center;color:var(--sub);font-size:12px;width:100%}
 </style>
 </head>
 <body>
@@ -248,26 +257,15 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
 
 <div class="wrap">
   <aside class="side">
-    <div class="card" id="paneHero">
-      <div class="hd"><h2>英雄筛选</h2>
-        <div class="hdright">
-          <span class="tip" id="heroSum" style="margin:0">全部英雄</span>
-          <button class="btn link" id="heroToggle">展开</button>
-        </div>
+    <div class="card" id="paneSrc">
+      <div class="hd"><h2>技能筛选</h2>
+        <div class="hdright"><span class="tip" id="srcSum" style="margin:0">—</span></div>
       </div>
-      <div class="bd" id="heroBody" style="display:none">
-        <div class="herorow">
-          <input id="heroQ" placeholder="搜索英雄（中文 / 英文）" spellcheck="false">
-          <button class="btn link" id="heroAll" title="勾选当前搜索到的英雄">全选</button>
-          <button class="btn link" id="heroNone" title="清空全部勾选 = 不按英雄筛选">清空</button>
-          <button class="btn link" id="heroInv" title="反选当前搜索到的英雄">反选</button>
-        </div>
-        <div class="herogrid" id="heroGrid"></div>
+      <div class="bd">
+        <div class="srclist" id="srcList"></div>
         <div class="tip" style="margin:0">
-          勾选后<b>只检索这些英雄的现版本技能</b>（多选=并集），可与 tag / 施法前摇条件同时生效；
-          <b>不勾选 = 全部技能</b>。名册取自后台「内容管理-英雄数据」的<b>人工处理数据 → 技能</b>，
-          共 <b id="heroTotal">—</b> 个英雄、<b id="heroSkTotal">—</b> 条现版本技能；
-          技能总表里残留的旧版本技能与废弃天赋不在其中，<b>不会被任何英雄命中</b>。
+          只检索勾选的<b>技能来源</b>（多选 = 并集），与 tag / 施法前摇条件同时生效。
+          目前数据里只有<b>现版本英雄技能</b>一类；物品技能、非英雄单位技能接入后会自动出现在这里。
         </div>
       </div>
     </div>
@@ -383,41 +381,71 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
 </div>
 
 <div class="mask" id="updMask">
-  <div class="modal" style="max-width:700px">
+  <div class="modal" style="max-width:760px">
     <div class="mhd"><h3>更新本地数据</h3><button class="btn" id="updClose">关闭</button></div>
     <div class="mbd">
-      <div class="actions" style="margin-top:0">
-        <button class="btn pri" id="updRun">开始更新</button>
-        <button class="btn" id="updRe">重新加载 data.js</button>
-        <button class="btn" id="updPick">选择文件载入…</button>
-        <span class="st" id="updTip"></span>
+
+      <div class="updsec">
+        <h4>方式一　抓取书签 <span class="tagm">推荐 · 所有人可用</span></h4>
+        <div class="tip" style="margin-top:0">
+          用<b>你自己的登录态</b>在后台页面抓取，抓完直接下载 <code>_raw.json</code>。
+          全程不传 Cookie、不上传任何数据 —— 数据只落在你自己的硬盘。
+        </div>
+        <div class="actions" style="margin-top:10px">
+          <a class="btn pri mkb" id="bkmkInstall" href="javascript:void(0)">📌 抓取 tagsearch 数据</a>
+          <button class="btn" id="bkmkCopy">复制书签代码</button>
+          <span class="st" id="bkmkTip"></span>
+        </div>
+        <ol class="steps">
+          <li>安装：把上面那个按钮 <b>拖到书签栏</b>；或<b>右键它 →「添加到收藏夹 / 添加书签」</b>（最稳）。<br>
+            　 也可以点「复制书签代码」，再手动新建书签、把代码粘进「网址」栏 ——
+            <b>粘贴后检查开头是否还有 <code>javascript:</code>，被浏览器吃掉就手动补上</b>。</li>
+          <li>打开并登录 <code>partner.dota2.com.cn</code> 后台任意页面。</li>
+          <li>点一下书签栏里的「抓取 tagsearch 数据」，右下角显示进度，跑完浏览器会自动下载 <code>_raw.json</code>。</li>
+          <li>回到本页，用下面<b>方式二</b>选中刚下载的 <code>_raw.json</code>；载入后会再导出一份 <code>data.js</code>，覆盖本目录同名文件即可长期免抓。</li>
+        </ol>
       </div>
-      <div class="svcline">更新服务地址
-        <input id="updSvc" spellcheck="false" placeholder="http://127.0.0.1:8899">
-        <button class="btn" id="updTest">测试连接</button>
-        <span class="st" id="updSt">—</span>
+
+      <div class="updsec">
+        <h4>方式二　选择文件载入 <span class="tagm">已有 data.js 或 _raw.json</span></h4>
+        <div class="actions" style="margin-top:0">
+          <button class="btn pri" id="updPick">选择文件载入…</button>
+          <button class="btn" id="updRe">重新加载 data.js</button>
+        </div>
+        <div class="tip">支持 <code>_raw.json</code>（书签抓取的原始结果）与 <code>data.js</code>；成功后会自动下载一份最新 <code>data.js</code>。</div>
       </div>
-      <div class="uplog" id="updLog" style="margin-top:10px"></div>
-      <div class="tip">
-        <b>为什么要走本机服务：</b>浏览器不会把 partner 的登录 Cookie 发给<b>跨站</b>请求，
-        页面自己 fetch 后台接口只会拿到「未登录」（已实测）。所以「开始更新」由本机
-        <code>serve.py</code> 调用 bsk，在<b>浏览器里已登录的 partner 标签页内</b>抓取官方接口
-        —— 你自己开着的 wiki 页面不受影响，抓取会在受控标签页里自动导航完成。
-      </div>
-      <div class="tip">
-        <b>三种更新方式</b><br>
-        ① <b>一键更新</b>：双击 <code>start.bat</code>（启动本机服务并打开本页）→ 点「开始更新」。<br>
-        　 前提：bsk daemon 在运行 + 浏览器已连接 browser-skill 扩展 + 已登录 partner 后台。<br>
-        ② <b>重新抓取</b>：双击 <code>refresh.bat</code>（走 bsk 抓取）→ 回本页点「重新加载 data.js」。<br>
-        ③ <b>离线替换</b>：把新的 <code>data.js</code> 或 <code>_raw.json</code> 用「选择文件载入…」读进来。<br>
-        成功后会自动把最新快照<b>下载为 data.js</b>，可直接覆盖本目录同名文件。
-      </div>
+
+      <details class="mk">
+        <summary>方式三　本机服务一键更新（仅维护者，需 bsk + 已登录浏览器）</summary>
+        <div class="actions" style="margin-top:0">
+          <button class="btn pri" id="updRun">开始更新</button>
+          <span class="st" id="updTip"></span>
+        </div>
+        <div class="svcline">更新服务地址
+          <input id="updSvc" spellcheck="false" placeholder="http://127.0.0.1:8899">
+          <button class="btn" id="updTest">测试连接</button>
+          <span class="st" id="updSt">—</span>
+        </div>
+        <div class="tip">
+          页面自己跨站 fetch 后台接口只会拿到「未登录」，所以由本机 <code>serve.py</code> 调用 bsk，
+          在<b>已登录的 partner 标签页内</b>抓取。双击 <code>start.bat</code> 启动服务；或直接跑 <code>refresh.sh</code>／<code>refresh.bat</code>，
+          再回本页点「重新加载 data.js」。
+        </div>
+      </details>
+
+      <div class="uplog" id="updLog" style="margin-top:0"></div>
       <input type="file" id="updFile" accept=".js,.json,application/json,text/javascript" style="display:none">
     </div>
   </div>
 </div>
 
 <datalist id="tagOptions"></datalist>
+
+<!-- BKMK_BEGIN -->
+<!-- 抓取书签代码：由 scripts/build_bookmarklet.py 从
+     scripts/fetch_tagdb.bookmarklet.js 生成，请勿手改本块 -->
+<script type="text/plain" id="bkmkSrc">(async function () { 'use strict'; var D = document; if (!/^partner\.dota2\.com\.cn$/i.test(location.hostname)) { alert('请先在已登录的 partner.dota2.com.cn 后台页面使用本抓取书签。'); return; } var box = D.getElementById('__tsbkBox'); if (!box) { box = D.createElement('div'); box.id = '__tsbkBox'; box.setAttribute('style', 'position:fixed;right:18px;bottom:18px;z-index:2147483647;width:336px;' + 'background:#101418;color:#e8eef5;border:1px solid #2c3946;border-radius:10px;padding:12px 14px;' + 'font:13px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.45)'); D.body.appendChild(box); } function paint(title, body, ok) { box.innerHTML = '<div style="font-weight:600;color:' + (ok === false ? '#ff9d9d' : ok ? '#8fe3a8' : '#cfe3ff') + ';margin-bottom:4px">' + title + '</div><div style="opacity:.85">' + body + '</div>'; } function step(t) { paint('正在抓取后台数据…', t); } step('准备中…'); function jarr(v) { if (v == null || v === '') return []; if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return []; } function ids(v) { if (v == null || v === '') return []; var out = [], arr = jarr(v); if (arr.length) { arr.forEach(function (x) { var n = parseInt(x, 10); if (!isNaN(n) && n > 0) out.push(n); }); return out; } if (typeof v === 'string') { v.split(',').forEach(function (t) { var n = parseInt(t, 10); if (!isNaN(n) && n > 0) out.push(n); }); } return out; } function getJSON(url, opt) { var o = opt || { credentials: 'include' }; if (!o.credentials) o.credentials = 'include'; return fetch(url, o).then(function (r) { if (r.status === 401 || r.status === 403) throw new Error('未登录或登录已过期（HTTP ' + r.status + '）'); if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + url); return r.json(); }).then(function (j) { if (j && typeof j.code === 'number' && j.code !== 0) { throw new Error('接口返回 code=' + j.code + (j.msg ? '（' + j.msg + '）' : '') + ' —— 请确认已登录后台'); } return j; }); } try { var tags = []; for (var p = 1; p <= 50; p++) { step('Tag 第 ' + p + ' 页…（已 ' + tags.length + ' 条）'); var j = await getJSON('/apg/admin/mechanism/list?page=' + p); var L = (j.data && j.data.list) || (j.data && j.data.data) || []; if (!L.length) break; L.forEach(function (t) { tags.push({ id: t.id, name: t.name, c1: t.cate1 || '', c2: t.cate2 || '', sort: t.sort, pid: t.pid }); }); } var abs = [], pages = 0; for (var p2 = 1; p2 <= 50; p2++) { step('技能第 ' + p2 + ' 页…（已 ' + abs.length + ' 条 / Tag ' + tags.length + '）'); var j2 = await getJSON('/apg/admin/hero/ability?page=' + p2); var L2 = (j2.data && j2.data.list) || []; pages = p2; if (!L2.length) break; L2.forEach(function (x) { var eff = jarr(x.skill_effect).map(function (e) { return { n: e.effect_input || '', t: ids(e.effect_tag) }; }); var mech = [], feat = []; jarr(x.skill_mechanism).forEach(function (mm) { var n = parseInt(mm.mechanism_tag, 10); if (isNaN(n) || n <= 0) return; mech.push(n); feat.push({ i: n, c: String(mm.mechanism_input == null ? '' : mm.mechanism_input) }); }); abs.push({ i: x.id, n: x.name_zh || '', en: x.name_en || '', d: ids(x.skill_detail), g: ids(x.tags), m: mech, f: feat, e: eff, note: String(x.skill_notes == null ? '' : x.skill_notes), cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim() }); }); } var heroes = []; try { step('英雄名册…（技能已 ' + abs.length + ' 条）'); var jh = await getJSON('/apg/admin/hero/list', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }); var LH = Array.isArray(jh.data) ? jh.data : ((jh.data && jh.data.list) || []); LH.forEach(function (h) { heroes.push({ i: h.id, zh: h.name_zh || '', en: h.name_en || '', a: h.attribute_primary || '', s: ids(h.ability_map) }); }); } catch (e) { heroes = []; } if (!tags.length || !abs.length) throw new Error('抓到的数据为空 —— 请确认已登录后台并有编辑权限'); step('生成文件…'); var payload = { ok: true, fetchedAt: new Date().toISOString(), tagCount: tags.length, abilityCount: abs.length, heroCount: heroes.length, pages: pages, tags: tags, abilities: abs, heroes: heroes }; var txt = JSON.stringify(payload); var sizeKB = Math.round(txt.length / 1024); var url = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); var a = D.createElement('a'); a.href = url; a.download = '_raw.json'; a.style.display = 'none'; D.body.appendChild(a); a.click(); D.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 30000); paint('✓ 已下载 _raw.json（' + sizeKB + ' KB）', 'Tag ' + tags.length + ' 条 · 技能 ' + abs.length + ' 条 · 英雄 ' + heroes.length + ' 个<br>' + '下一步：打开检索器 → 右上角「⟳ 更新本地数据」→「选择文件载入…」→ 选刚下载的 _raw.json' + '<br><span style="opacity:.6">本浮层不会自动关闭，可手动关掉浏览器标签或刷新页面。</span>', true); } catch (e) { paint('✗ 抓取失败', (e && e.message ? e.message : String(e)) + '<br><span style="opacity:.7">若提示未登录，请先登录后台再点书签；' + '若书签被浏览器拦截（CSP），可在后台页按 F12 打开控制台，把书签代码粘贴进去回车。</span>', false); } })();</script>
+<!-- BKMK_END -->
 
 <script src="data.js"></script>
 <script src="search-core.js"></script>
@@ -427,14 +455,16 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   var DB = window.TAGDB;
   var core = window.TagSearch;
   var idx = null;
+  var NODATA = false;                // 启动时没找到 data.js（界面改为引导语，且允许载入文件）
   var MODE = 'tag';                  // 'tag' Tag 检索 | 'note' 注释检索 —— 同一时间只展示一种
-  var S = { tag: null, note: null }; // 两种模式各自的上次检索（{query, result}），互不影响
+  // 两种模式各自的上次检索（{query, result}），互不影响；*Had 记录「是否成功检索过」，
+  // 供「技能来源」从空恢复勾选时决定要不要自动重跑
+  var S = { tag: null, note: null, tagHad: false, noteHad: false };
   var viewMode = 'full';   // 'full' 详细（默认） | 'compact' 简洁（仅升级图标 + 技能名）
   var EXLABEL = {};
   var EXTIP = {};
   (core.EXCLUDE_KINDS || []).forEach(function (k) { EXLABEL[k.key] = k.label; EXTIP[k.key] = k.tip; });
   var HERO_ATTRS = ['力量', '敏捷', '智力', '全才'];
-  var ATTR_CLS = { '力量': 'a-str', '敏捷': 'a-agi', '智力': 'a-int', '全才': 'a-uni' };
 
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) {
@@ -444,10 +474,15 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   };
 
   // ---------- 启动 ----------
-  if (!DB || !core) {
+  // 没有 data.js 也要能用：用空库启动，让「更新本地数据」仍可点（否则新使用者永远进不来）
+  if (!core) {
     document.querySelector('.tblbox').innerHTML =
-      '<div class="empty">未找到数据文件 data.js —— 请先运行 <b>refresh.sh</b>（或 refresh.bat）抓取数据。</div>';
+      '<div class="empty">缺少 <b>search-core.js</b> —— 请确认它和 index.html 在同一目录。</div>';
     return;
+  }
+  if (!DB) {
+    NODATA = true;
+    DB = { fetchedAt: '', tags: [], abilities: [], heroes: [], featText: {}, notePool: [] };
   }
   idx = core.createIndex(DB);
   setMeta();
@@ -455,7 +490,8 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   var dl = $('tagOptions');
   fillTagOptions();
 
-  // ---------- 英雄筛选（名册来自后台「内容管理-英雄数据」） ----------
+  // ---------- 英雄（内部细化条件；界面上不再列出英雄，勾选只由控制台 / 自动化钩子设置） ----------
+  // 与左侧「技能筛选」（数据来源）是两层：来源决定「查哪些类数据」，英雄只用来进一步缩小范围。
   var heroSel = new Set();          // 已勾选的英雄 id（空 = 不按英雄筛选）
 
   /** 有技能记录的英雄（「傀儡目标」这类 0 技能条目没有筛选意义） */
@@ -482,71 +518,101 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     return list.slice(0, max).join('、') + ' 等 ' + list.length + ' 个';
   }
 
-  function syncHeroSum() {
-    var tot = heroList().length;
-    var n = heroSel.size;
-    $('heroSum').textContent = n ? ('已选 ' + n + ' / ' + tot) : ('全部英雄（' + tot + '）');
-    $('heroSum').style.color = n ? 'var(--pri)' : '';
-    $('heroSum').style.fontWeight = n ? '600' : '';
-    $('heroSum').title = n ? ('已选：' + heroNames(Array.from(heroSel), 20)) : '未按英雄筛选';
-    $('heroTotal').textContent = tot;
-    var sk = $('heroSkTotal');
-    if (sk) sk.textContent = idx.heroedSkills || 0;
+  // ---------- 技能筛选（按数据来源；登记表见 search-core.js 的 SOURCES） ----------
+  // 目前数据里只有「现版本英雄技能」一类；物品技能 / 非英雄单位技能接入后，
+  // 在登记表里把对应条目的 ready 改成 true，这里就会自动多出一个勾选项。
+  var SRC_READY = core.SOURCES.filter(function (s) { return s.ready; });
+  var srcSel = new Set(SRC_READY.map(function (s) { return s.key; }));   // 默认全勾
+
+  function srcMeta(key) {
+    for (var i = 0; i < core.SOURCES.length; i++) {
+      if (core.SOURCES[i].key === key) return core.SOURCES[i];
+    }
+    return { key: key, label: key, tip: '未登记的技能来源：' + key };
+  }
+  function srcLabel(key) { return srcMeta(key).label; }
+  function readSources() { return Array.from(srcSel); }
+
+  /** 数据里出现的来源是否已全部勾上 —— 是则不构成筛选 */
+  function srcAllOn() {
+    var all = (idx && idx.sources) || [];
+    return all.every(function (k) { return srcSel.has(k); });
   }
 
-  /** 勾选状态 → chip 高亮（整格重绘成本低，但保留滚动位置） */
-  function paintHeroGrid() {
-    Array.prototype.slice.call($('heroGrid').querySelectorAll('.hchip')).forEach(function (lb) {
-      var inp = lb.querySelector('input');
-      var on = heroSel.has(Number(inp.value));
-      lb.classList.toggle('on', on);
-      if (inp.checked !== on) inp.checked = on;
-    });
+  function syncSrcSum() {
+    var all = (idx && idx.sources) || [];
+    var n = 0;
+    all.forEach(function (k) { if (srcSel.has(k)) n++; });
+    var el = $('srcSum');
+    if (!all.length) { el.textContent = '无数据'; el.title = ''; el.style.color = ''; el.style.fontWeight = ''; return; }
+    if (!n) { el.textContent = '未选来源'; el.title = '至少勾选一类技能来源才能检索'; }
+    else if (srcAllOn()) { el.textContent = '全部来源'; el.title = '当前数据的技能全部参与检索'; }
+    else { el.textContent = '已选 ' + n + ' / ' + all.length + ' 类'; el.title = '只检索：' + readSources().map(srcLabel).join('、'); }
+    el.style.color = (!n) ? 'var(--not)' : (srcAllOn() ? '' : 'var(--pri)');
+    el.style.fontWeight = srcAllOn() ? '' : '600';
   }
 
-  function renderHeroGrid() {
-    var q = $('heroQ').value.trim().toLowerCase();
-    var all = heroList();
-    var list = all.filter(function (h) {
-      return !q || String(h.zh).toLowerCase().indexOf(q) >= 0 || String(h.en).toLowerCase().indexOf(q) >= 0;
-    });
-    if (!all.length) {
-      $('heroGrid').innerHTML = '<div class="heroEmpty">当前 data.js 不含英雄名册（旧快照）—— 请点右上角「⟳ 更新本地数据」重新抓取。</div>';
+  /** 来源列表：登记表里 ready 的 + 数据里实际出现的（后者防止数据先到、界面看不到） */
+  function renderSrcList() {
+    var all = (idx && idx.sources) || [];
+    var keys = SRC_READY.map(function (s) { return s.key; });
+    all.forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); });
+    if (!keys.length) {
+      $('srcList').innerHTML = '<div class="tip" style="margin:0">当前数据没有技能来源信息。</div>';
+      syncSrcSum();
       return;
     }
-    if (!list.length) {
-      $('heroGrid').innerHTML = '<div class="heroEmpty">没有匹配「' + esc($('heroQ').value.trim()) + '」的英雄</div>';
-      return;
-    }
-    $('heroGrid').innerHTML = list.map(function (h) {
-      var on = heroSel.has(h.i);
-      var n = idx.heroSkills.get(h.i) || 0;
-      var nv = (idx.heroSkillsValid && idx.heroSkillsValid.get(h.i)) || 0;
-      var tip = h.zh + '（' + (h.en || '—') + '）' + (h.a ? '　·　' + h.a : '') +
-        '　·　现版本技能 ' + nv + ' 条' + (n > nv ? '（另有 ' + (n - nv) + ' 条默认被排除）' : '');
-      return '<label class="hchip' + (on ? ' on' : '') + '" title="' + esc(tip) + '">' +
-        '<input type="checkbox" value="' + h.i + '"' + (on ? ' checked' : '') + '>' +
-        '<span class="dot ' + (ATTR_CLS[h.a] || 'a-uni') + '"></span>' +
-        '<span>' + esc(h.zh || h.en) + '</span></label>';
+    $('srcList').innerHTML = keys.map(function (k) {
+      var m = srcMeta(k);
+      var on = srcSel.has(k);
+      var n = (idx && idx.sourceCount && idx.sourceCount[k]) || 0;
+      return '<label class="schip' + (on ? ' on' : ' off') + '" title="' + esc(m.tip || '') + '">' +
+        '<input type="checkbox" value="' + esc(k) + '"' + (on ? ' checked' : '') + '>' +
+        '<span>' + esc(m.label) + '</span>' +
+        '<span class="cnt">' + n + ' 条</span></label>';
     }).join('');
+    syncSrcSum();
   }
 
-  /** 当前可见（经搜索过滤）的英雄 id */
-  function visibleHeroIds() {
-    return Array.prototype.slice.call($('heroGrid').querySelectorAll('.hchip input'))
-      .map(function (i) { return Number(i.value); });
-  }
-
-  /** 勾选变化 → 重绘 + 用同一条件重跑已有结果（两种模式各自独立）
+  /** 来源勾选变化 → 重绘 + 用同一条件重跑已有结果（两种模式各自独立）
    *  quiet = true 时只重算并存结果，不渲染（避免把另一模式的结果画到当前表格里） */
-  function heroChanged() {
-    syncHeroSum();
-    renderHeroGrid();
+  function srcChanged() {
+    renderSrcList();
     updateExpr();
     var qt = MODE !== 'tag', qn = MODE !== 'note';
     if (S.tag) runTag(qt);
     if (S.note) runNote(qn);
-    // 首次只勾英雄、还没检索过 → 直接把当前模式跑一次（英雄筛选本身就是有效条件）
+    // 当前模式没有可显示的结果时：来源有效且（之前检索过 / 来源确实缩小了范围）→ 直接重跑一次
+    if (!S.tag && MODE === 'tag' && readSources().length && (S.tagHad || !srcAllOn())) runTag(false);
+    if (!S.note && MODE === 'note' && readSources().length && (S.noteHad || !srcAllOn())) runNote(false);
+    redraw();
+  }
+
+  function setSources(keys, additive) {
+    if (!additive) srcSel.clear();
+    (keys || []).forEach(function (k) {
+      k = String(k == null ? '' : k).trim();
+      if (!k) return;
+      if (additive && srcSel.has(k)) srcSel.delete(k); else srcSel.add(k);
+    });
+    srcChanged();
+  }
+
+  $('srcList').addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t || t.type !== 'checkbox') return;
+    if (t.checked) srcSel.add(t.value); else srcSel.delete(t.value);
+    srcChanged();
+  });
+
+  /** 英雄勾选变化 → 用同一条件重跑已有结果（界面不再列出英雄，勾选只由控制台 / 自动化钩子设置）
+   *  quiet = true 时只重算并存结果，不渲染（避免把另一模式的结果画到当前表格里） */
+  function heroChanged() {
+    updateExpr();
+    var qt = MODE !== 'tag', qn = MODE !== 'note';
+    if (S.tag) runTag(qt);
+    if (S.note) runNote(qn);
+    // 还没检索过、但已有英雄条件 → 直接把当前模式跑一次
     if (!S.tag && MODE === 'tag' && heroSel.size) runTag(false);
     if (!S.note && MODE === 'note' && heroSel.size) runNote(false);
     redraw();
@@ -562,35 +628,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     heroChanged();
   }
 
-  $('heroToggle').addEventListener('click', function () {
-    var open = $('heroBody').style.display !== 'none';
-    $('heroBody').style.display = open ? 'none' : '';
-    $('heroToggle').textContent = open ? '展开' : '收起';
-    if (!open) $('heroQ').focus();
-  });
-  $('heroQ').addEventListener('input', renderHeroGrid);
-  $('heroQ').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); if (MODE === 'tag') runTag(); else runNote(); }
-  });
-  $('heroAll').addEventListener('click', function () { setHeroes(visibleHeroIds(), false); });
-  $('heroNone').addEventListener('click', function () { setHeroes([], false); });
-  $('heroInv').addEventListener('click', function () {
-    var vis = visibleHeroIds();
-    var add = vis.filter(function (id) { return !heroSel.has(id); });
-    var del = vis.filter(function (id) { return heroSel.has(id); });
-    del.forEach(function (id) { heroSel.delete(id); });
-    add.forEach(function (id) { heroSel.add(id); });
-    heroChanged();
-  });
-  $('heroGrid').addEventListener('change', function (e) {
-    var t = e.target;
-    if (!t || t.type !== 'checkbox') return;
-    var id = Number(t.value);
-    if (t.checked) heroSel.add(id); else heroSel.delete(id);
-    heroChanged();
-  });
-  renderHeroGrid();
-  syncHeroSum();
+  renderSrcList();
 
   function readHeroes() { return Array.from(heroSel); }
 
@@ -712,15 +750,21 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     var castOn = core.castActive(cast);
     var tags = collect('and').length + collect('or').length + collect('not').length;
     var heroes = readHeroes();
+    var sources = readSources();
     var q = {
       and: collect('and'), or: collect('or'), not: collect('not'),
       scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
       cast: castOn ? { min: cast.min, max: cast.max } : null,
-      heroes: heroes
+      heroes: heroes, sources: sources
     };
+    if (!sources.length) {
+      if (!quiet) showSrcBlock();
+      S.tag = null;
+      return;
+    }
     if (!tags && !castOn && !heroes.length) {
       if (!quiet) {
-        $('tblbox').innerHTML = '<div class="empty">请至少输入一个 tag，或设置「施法前摇」区间，或勾选英雄</div>';
+        $('tblbox').innerHTML = '<div class="empty">请至少输入一个 tag，或设置「施法前摇」区间</div>';
         $('nHit').textContent = '0'; $('nScan').textContent = '';
         $('btnCsv').disabled = true;
       }
@@ -737,13 +781,22 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
 
     var r = core.search(idx, q);
     S.tag = { query: q, result: r, castSwapped: cast.swapped };
+    S.tagHad = true;
     if (!quiet) renderTag(r);
   }
 
   // ---------- 检索（注释模式，与 Tag 模式互不影响） ----------
   function runNote(quiet) {
     quiet = (quiet === true);
-    var q = { q: $('noteQ').value.trim(), includeExcluded: $('showExN').checked, heroes: readHeroes() };
+    var q = {
+      q: $('noteQ').value.trim(), includeExcluded: $('showExN').checked,
+      heroes: readHeroes(), sources: readSources()
+    };
+    if (!q.sources.length) {
+      if (!quiet) showSrcBlock();
+      S.note = null;
+      return;
+    }
     if (!q.q) {
       if (!quiet) {
         $('tblbox').innerHTML = '<div class="empty">请输入要查找的注释内容</div>';
@@ -755,6 +808,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     }
     var r = core.searchNotes(idx, q);
     S.note = { query: q, result: r };
+    S.noteHad = true;
     if (!quiet) renderNote(r);
   }
 
@@ -856,9 +910,15 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       if (c.out) extra.push('前摇不在该区间 <b>' + c.out + '</b> 个');
       html += '<div class="infobox" style="margin:12px 14px 0">已按<b>施法前摇 ' + esc(rng) +
         ' 秒</b>（闭区间）筛选' +
-        (extra.length ? '，在' + (r.stats.hero && r.stats.hero.on ? '符合英雄筛选且满足 tag 条件' : '满足 tag 条件') +
+        (extra.length ? '，在' + (r.stats.hero && r.stats.hero.on ? '符合英雄条件且满足 tag 条件' : '满足 tag 条件') +
           '的技能中另排除 ' + extra.join(' / ') : '') +
         '，剩 <b>' + r.hits.length + '</b> 条。</div>';
+    }
+    if (r.stats && r.stats.src && r.stats.src.on) {
+      var ss = r.stats.src;
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>技能来源</b>筛选：' +
+        esc(ss.keys.map(srcLabel).join('、')) +
+        '，另排除其他来源的技能 <b>' + ss.out + '</b> 条。</div>';
     }
     if (r.stats && r.stats.hero && r.stats.hero.on) {
       var hh = r.stats.hero;
@@ -872,7 +932,10 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     }
     if (!r.hits.length) {
       $('tblbox').innerHTML = html + '<div class="empty">没有技能满足当前条件' +
-        (r.stats && r.stats.hero && r.stats.hero.on ? '（提示：未被登记给任何英雄的条目——旧版本技能、通用天赋、废弃条目——不会被命中）' : '') +
+        ((r.stats && r.stats.hero && r.stats.hero.on)
+          ? '（提示：未被登记给任何英雄的条目——旧版本技能、通用天赋、废弃条目——不会被命中）'
+          : ((r.stats && r.stats.src && r.stats.src.on)
+            ? '（提示：只检索了勾选的技能来源，其他来源的条目不会出现在结果里）' : '')) +
         '</div>';
       return;
     }
@@ -991,6 +1054,12 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         html += '<div class="infobox" style="margin:12px 14px 0">已默认排除 <b>' + r.stats.excludedTotal +
           '</b> 条非技能条目' + detail + '，检索基于其余 <b>' + r.stats.effective + '</b> 条。</div>';
       }
+    }
+    if (r.stats && r.stats.src && r.stats.src.on) {
+      var ss = r.stats.src;
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>技能来源</b>筛选：' +
+        esc(ss.keys.map(srcLabel).join('、')) +
+        '，另排除其他来源的技能 <b>' + ss.out + '</b> 条。</div>';
     }
     if (r.stats && r.stats.hero && r.stats.hero.on) {
       var hh = r.stats.hero;
@@ -1128,10 +1197,31 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   });
 
   // ---------- 模式切换 / 结果重绘 ----------
+  /** 一类技能来源都没勾 → 没有可检索的数据（拦住检索，也不显示旧结果） */
+  function showSrcBlock() {
+    $('tblbox').innerHTML = '<div class="empty">请至少勾选一类「技能来源」——左侧「技能筛选」全部未勾时没有可检索的数据</div>';
+    $('nHit').textContent = '0'; $('nScan').textContent = '';
+    $('btnCsv').disabled = true;
+    updateViewBtn();
+  }
+
   function showEmpty() {
     $('nHit').textContent = '0';
     $('nScan').textContent = '';
     $('btnCsv').disabled = true;
+    if (NODATA) {
+      $('tblbox').innerHTML = '<div class="empty">'
+        + '<div style="font-size:15px;color:var(--text);margin-bottom:10px">还没有数据 —— 先抓一份</div>'
+        + '<div style="line-height:2">'
+        + '① 点右上角 <b>「⟳ 更新本地数据」</b> → 把 <b>「📌 抓取 tagsearch 数据」</b> 拖到书签栏<br>'
+        + '② 打开并登录 <code>partner.dota2.com.cn</code> 后台，点一下那个书签 → 自动下载 <code>_raw.json</code><br>'
+        + '③ 回到本页点 <b>「选择文件载入…」</b> 选中它，即可开始检索<br>'
+        + '</div>'
+        + '<div style="margin-top:12px;font-size:12px;opacity:.7">维护者也可直接跑 <code>refresh.sh</code>／<code>refresh.bat</code> 生成 data.js。</div>'
+        + '</div>';
+      updateViewBtn();
+      return;
+    }
     $('tblbox').innerHTML = MODE === 'tag'
       ? '<div class="empty">在左侧输入 tag 名称后点击「检索」</div>'
       : '<div class="empty">在左侧输入要查找的注释内容后点击「检索」</div>';
@@ -1140,6 +1230,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
 
   /** 就地重绘当前模式的结果（切换简/详、切换模式时用，不重新检索） */
   function redraw() {
+    if (!readSources().length) { showSrcBlock(); return; }
     var st = MODE === 'tag' ? S.tag : S.note;
     if (!st) { showEmpty(); return; }
     if (MODE === 'tag') renderTag(st.result); else renderNote(st.result);
@@ -1286,6 +1377,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   /** 载入一份新的 TAGDB：就地重建索引，界面立即生效 */
   function applyDb(db, src) {
     if (!db || !db.tags || !db.abilities) { ulog('数据格式不正确，已忽略', 'er'); return false; }
+    NODATA = false;
     var hadTag = !!(S.tag && S.tag.query), hadNote = !!(S.note && S.note.query);
     window.TAGDB = db; DB = db; idx = core.createIndex(db);
     S.tag = null; S.note = null;
@@ -1293,7 +1385,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     var alive = new Set((idx.heroes || []).map(function (h) { return h.i; }));
     Array.from(heroSel).forEach(function (id) { if (!alive.has(id)) heroSel.delete(id); });
     setMeta(); fillTagOptions(); revalidateAll(true);
-    renderHeroGrid(); syncHeroSum(); updateExpr();
+    renderSrcList(); updateExpr();
     ulog('已载入数据：Tag ' + db.tags.length + ' 条 / 技能 ' + db.abilities.length +
       ' 条（' + (src || '未知来源') + '）', 'ok');
     if (MODE === 'tag' && hadTag) { ulog('按当前条件重新检索…', 'dim'); runTag(); }
@@ -1413,28 +1505,170 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     });
   }
 
+  // ---------- _raw.json → 内部数据（等价于 build_data.py：特性/注释池化 + 英雄归属） ----------
+  /**
+   * 技能注释富文本（Quill 输出）→ [{ind, text}]
+   * 与 build_data.py 的 NoteParser 同规则：li/p 分段、ql-indent-N 取层级、br 换行、
+   * img 记为「〔图〕」、其余行内标签只留文字、空白压缩。
+   */
+  function noteLines(html) {
+    if (!html || typeof html !== 'string') return [];
+    var out = [], buf = '';
+    function flush(ind) {
+      var s = String(buf).replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+      if (s) out.push({ ind: ind, text: s });
+      buf = '';
+    }
+    function walk(node, ind) {
+      if (!node) return;
+      if (node.nodeType === 3) { buf += node.nodeValue; return; }
+      if (node.nodeType !== 1) return;
+      var tag = String(node.tagName || '').toLowerCase();
+      if (tag === 'li' || tag === 'p') {
+        flush(ind);
+        var m = /(?:^|\s)ql-indent-(\d+)/.exec(node.className || '');
+        var ind2 = m ? parseInt(m[1], 10) : 0;
+        for (var i = 0; i < node.childNodes.length; i++) walk(node.childNodes[i], ind2);
+        flush(ind2);
+        return;
+      }
+      if (tag === 'br') { flush(ind); return; }
+      if (tag === 'img') { buf += '〔图〕'; return; }
+      for (var j = 0; j < node.childNodes.length; j++) walk(node.childNodes[j], ind);
+    }
+    var doc = null;
+    try { doc = new DOMParser().parseFromString('<div id="__nt">' + html + '</div>', 'text/html'); }
+    catch (e) { return []; }
+    var root = doc && doc.getElementById('__nt');
+    if (!root) return [];
+    for (var k = 0; k < root.childNodes.length; k++) walk(root.childNodes[k], 0);
+    flush(0);
+    return out;
+  }
+
+  /**
+   * 抓取的原始结果（书签下载的 _raw.json）→ data.js 结构。
+   * 技能归属**只认 ability_map**（英雄数据页的现版本技能），禁止用英文名前缀推断。
+   */
+  function buildDbFromRaw(raw) {
+    var d = raw || {};
+    var featText = {}, notePool = [], poolIdx = {};
+    function featSlot(tid, txt) {
+      var arr = featText[tid] || (featText[tid] = []);
+      var k = arr.indexOf(txt);
+      if (k < 0) { arr.push(txt); k = arr.length - 1; }
+      return k;
+    }
+    function noteSlot(t) {
+      var i = poolIdx[t];
+      if (i == null) { i = notePool.length; notePool.push(t); poolIdx[t] = i; }
+      return i;
+    }
+
+    var heroes = [], skillHero = {}, hlist = d.heroes || [];
+    for (var i = 0; i < hlist.length; i++) {
+      var h = hlist[i] || {};
+      var hid = parseInt(h.i, 10) || 0;
+      if (hid <= 0) continue;
+      heroes.push({ i: hid, zh: h.zh || '', en: h.en || '', a: String(h.a == null ? '' : h.a) });
+      var sl = h.s || [];
+      for (var j = 0; j < sl.length; j++) {
+        var sid = parseInt(sl[j], 10) || 0;
+        if (sid <= 0) continue;
+        var arr = skillHero[sid] || (skillHero[sid] = []);
+        if (arr.indexOf(hid) < 0) arr.push(hid);
+      }
+    }
+
+    var src = d.abilities || [], out = [];
+    for (var n = 0; n < src.length; n++) {
+      var a = src[n] || {};
+      var b = { i: a.i, n: a.n, en: a.en, d: a.d || [], g: a.g || [], m: a.m || [], e: a.e || [] };
+      var hs = skillHero[a.i];
+      if (hs && hs.length) b.h = hs;
+
+      var rawF = a.f || [], fidx = [];
+      for (var q = 0; q < rawF.length; q++) {
+        var it = rawF[q];
+        if (!it || typeof it !== 'object') { fidx.push(-1); continue; }
+        var tid = parseInt(it.i, 10) || 0;
+        var c = String(it.c == null ? '' : it.c).trim();
+        fidx.push((tid > 0 && c) ? featSlot(tid, c) : -1);
+      }
+      if (fidx.length) b.f = fidx;
+
+      var lines = noteLines(a.note);
+      if (lines.length) {
+        b.nt = lines.map(function (x) { return noteSlot(x.text); });
+        var inds = lines.map(function (x) { return x.ind; });
+        if (inds.some(function (x) { return !!x; })) b.ni = inds;
+      }
+
+      var cp = String(a.cp == null ? '' : a.cp).trim();
+      if (cp) b.cp = cp;
+      out.push(b);
+    }
+
+    return {
+      fetchedAt: d.fetchedAt || '',
+      tags: (d.tags || []).map(function (t) {
+        return { id: t.id, name: t.name, c1: t.c1 || '', c2: t.c2 || '' };
+      }),
+      featText: featText,
+      notePool: notePool,
+      abilities: out,
+      heroes: heroes
+    };
+  }
+
   function loadFromText(txt, name) {
     var s2 = String(txt || '').replace(/^\uFEFF/, '').trim();
     var db = null, m = s2.match(/window\.TAGDB\s*=\s*([\s\S]*?);?\s*$/);
     if (m) { try { db = JSON.parse(m[1]); } catch (e) { db = null; } }
     if (!db) { try { db = JSON.parse(s2); } catch (e) { db = null; } }
     if (!db) { ulog('无法识别文件内容：' + esc(name) + '（需 data.js 或 _raw.json）', 'er'); return; }
-    if (db.ok && db.abilities && db.tags) {                       // 抓取原始结果 _raw.json
-      db = {
-        fetchedAt: db.fetchedAt || '',
-        tags: db.tags.map(function (t) { return { id: t.id, name: t.name, c1: t.c1 || '', c2: t.c2 || '' }; }),
-        abilities: db.abilities
-      };
+    if (db.ok && db.abilities && db.tags) {                 // 书签抓取的原始结果
+      ulog('识别为 _raw.json —— 正在构建检索数据（特性/注释池化、英雄归属）…', 'dim');
+      try { db = buildDbFromRaw(db); }
+      catch (e) { ulog('✗ 构建失败：' + ((e && e.message) || e), 'er'); return; }
     }
     if (applyDb(db, name)) downloadDataJs(db);
   }
+
+  // ---------- 抓取书签：把内联代码变成可拖拽的书签 ----------
+  // 建一个 javascript: 链接，使用者拖到书签栏即可；不涉及任何凭据与数据上传。
+  (function initBookmarklet() {
+    var srcEl = document.getElementById('bkmkSrc');
+    var aEl = $('bkmkInstall'), cpEl = $('bkmkCopy');
+    if (!srcEl || !aEl || !cpEl) return;
+    var code = String(srcEl.textContent || '').trim();
+    if (!code) { aEl.style.display = 'none'; cpEl.style.display = 'none'; return; }
+    var url = 'javascript:' + encodeURIComponent(code);
+    aEl.setAttribute('href', url);
+    aEl.setAttribute('title', '拖到书签栏安装；或点右侧「复制书签代码」后手动新建书签');
+    cpEl.addEventListener('click', function () {
+      var ok = function () { $('bkmkTip').innerHTML = '<span class="g">已复制</span>　新建书签 → 网址栏粘贴'; };
+      var bad = function () { $('bkmkTip').innerHTML = '<span class="r">复制失败</span>　可直接把左边按钮拖到书签栏'; };
+      var fb = function () {
+        var t = document.createElement('textarea');
+        t.value = url;
+        t.style.position = 'fixed'; t.style.top = '-9999px';
+        document.body.appendChild(t); t.select();
+        var done = false;
+        try { done = document.execCommand('copy'); } catch (e) { done = false; }
+        document.body.removeChild(t);
+        if (done) ok(); else bad();
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(ok, fb);
+      else fb();
+    });
+  })();
 
   $('btnUpdate').addEventListener('click', function () {
     $('mask').classList.remove('on');
     $('updMask').classList.add('on');
     if (!$('updSvc').value) $('updSvc').value = lsGet(SVC_KEY);
-    $('updSt').innerHTML = '<span class="st">检测中…</span>';
-    pingSvc(1800).then(function (j) { showSvcState(j); }, function () { showSvcState(null); });
+    $('updSt').innerHTML = '<span class="st">未测试</span>';
   });
   $('updClose').addEventListener('click', function () { $('updMask').classList.remove('on'); });
   $('updMask').addEventListener('click', function (e) { if (e.target === $('updMask')) $('updMask').classList.remove('on'); });
@@ -1466,10 +1700,13 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   window.__tagsearch = {
     applyDb: applyDb, reloadDataJs: reloadDataJs, downloadDataJs: downloadDataJs,
     loadFromText: loadFromText, doUpdate: doUpdate,
+    buildDbFromRaw: buildDbFromRaw, noteLines: noteLines,
     setMode: setMode, runTag: runTag, runNote: runNote,
     mode: function () { return MODE; },
     searchNotes: function (q) {
-      return core.searchNotes(idx, { q: q, includeExcluded: $('showExN').checked, heroes: readHeroes() });
+      return core.searchNotes(idx, {
+        q: q, includeExcluded: $('showExN').checked, heroes: readHeroes(), sources: readSources()
+      });
     },
     /** 检索前摇区间（供自动化/测试）：min/max 传 null 表示该侧不限 */
     searchCast: function (min, max) {
@@ -1477,7 +1714,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         and: collect('and'), or: collect('or'), not: collect('not'),
         scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
         cast: (min == null && max == null) ? null : { min: min, max: max },
-        heroes: readHeroes()
+        heroes: readHeroes(), sources: readSources()
       };
       return core.search(idx, q);
     },
@@ -1486,12 +1723,32 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       var q = {
         and: collect('and'), or: collect('or'), not: collect('not'),
         scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
-        cast: null, heroes: ids || []
+        cast: null, heroes: ids || [], sources: readSources()
       };
       return core.search(idx, q);
     },
-    /** 设置/读取英雄勾选（界面同步刷新） */
+    /** 只按技能来源筛选（供自动化/测试）：keys 为来源 key 数组，缺省=数据里的全部来源 */
+    searchSources: function (keys) {
+      var q = {
+        and: collect('and'), or: collect('or'), not: collect('not'),
+        scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
+        cast: null, heroes: readHeroes(), sources: keys || []
+      };
+      return core.search(idx, q);
+    },
+    /** 设置/读取英雄勾选（英雄不再在界面列出，仅供控制台/自动化细化） */
     setHeroes: function (ids) { setHeroes(ids || [], false); return readHeroes(); },
+    /** 设置/读取技能来源勾选（界面同步刷新） */
+    setSources: function (keys) { setSources(keys || [], false); return readSources(); },
+    sources: function () {
+      return {
+        ready: SRC_READY.map(function (s) { return s.key; }),
+        inData: (idx.sources || []).slice(),
+        count: Object.assign({}, idx.sourceCount || {}),
+        selected: readSources(),
+        allOn: srcAllOn()
+      };
+    },
     heroes: function () {
       return {
         total: (idx.heroes || []).length,
@@ -1520,6 +1777,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         includeExcluded: $('showEx').checked,
         mode: MODE, notePool: ns.pool, noteSkills: ns.skills,
         heroTotal: (idx.heroes || []).length, heroSelected: readHeroes().length,
+        sources: (idx.sources || []).slice(), sourcesSelected: readSources(), sourcesAllOn: srcAllOn(),
         heroedSkills: idx.heroedSkills, unexplainedSkills: idx.unexplainedSkills,
         hasTag: !!S.tag, hasNote: !!S.note
       };
@@ -1532,8 +1790,12 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     var def = /^https?:/.test(location.protocol) ? location.origin : 'http://127.0.0.1:8899';
     $('updSvc').value = saved || def;
     if (!$('updLog').childNodes.length) {
-      ulog('数据快照：' + ($('mTime').textContent) + '（Tag ' + idx.db.tags.length + ' / 技能 ' + idx.abilities.length + ' 条）', 'dim');
-      ulog('点「开始更新」从 partner 后台抓取最新数据；抓取期间请保持浏览器可用（wiki 页面可与本工具同时打开）。', 'dim');
+      ulog('当前数据：' + ($('mTime').textContent) + '（Tag ' + idx.db.tags.length + ' / 技能 ' + idx.abilities.length + ' 条）', 'dim');
+      if (NODATA) {
+        ulog('还没有数据 —— 用「方式一」的抓取书签抓一份，或用「方式二」载入已有的 data.js / _raw.json。', 'er');
+      } else {
+        ulog('数据过旧时：用「方式一」书签重抓，或载入新的 data.js / _raw.json。', 'dim');
+      }
     }
   })();
 
@@ -1559,6 +1821,9 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     if (heroSel.size) {
       seg.push('(<span class="p hp">英雄</span>' + esc(heroNames(Array.from(heroSel), 4)) + ')');
     }
+    if (!srcAllOn() && readSources().length) {
+      seg.push('(<span class="p src">来源</span>' + esc(readSources().map(srcLabel).join('、')) + ')');
+    }
     var ww = (o.length === 1)
       ? '<span class="ww">⚠ 「或」只填了 1 项 —— 此时它等价于「且」（必须包含该项），不构成「或」。「或」至少需要 2 项。</span>'
       : '';
@@ -1576,7 +1841,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     refreshAddBtns();
     $('cpMin').value = ''; $('cpMax').value = '';
     updateExpr();
-    S.tag = null;
+    S.tag = null; S.tagHad = false;
     if (MODE === 'tag') showEmpty(); else $('btnCsv').disabled = !S.note;
   });
 

@@ -3,6 +3,18 @@ data.js
 _raw.json
 *.crdownload
 
+# ---- 构建产物（由 scripts/build_bookmarklet.py 生成，已内联进 index.html）----
+scripts/bookmarklet.min.txt
+
+# ---- 测试残留 ----
+_nodata_test.html
+
+# ---- 凭据（绝不入库：后台登录 Cookie 等同编辑权限）----
+.cookie
+cookie*
+*cookies*.json
+cookies.txt
+
 # ---- Python ----
 __pycache__/
 *.py[cod]
