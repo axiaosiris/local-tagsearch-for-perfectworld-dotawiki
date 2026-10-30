@@ -19,6 +19,10 @@
    ⚠️ 不做英文名推断：技能总表里残留大量旧版本技能（米波 meepo_geostrike 地之突袭、
    幽鬼 spectre_haunt_single 如影随形、meepo_pack_rat 囤积狂鼠等）与废弃天赋，
    前缀也属于某英雄，推断会把旧技能混进筛选结果。未登记者 h 留空（= 非现版本英雄技能）。
+
+4) 物品技能（抓取时 items = 内容管理-道具技能全量，字段与英雄技能一致）
+   与英雄技能共用同一套池化；技能侧多一个 src='item' 标记（英雄技能不写 src，缺省即 'hero'）。
+   ⚠️ 物品技能 id 与英雄技能**不是同一个编号空间**（都从 1 开始），所以一律不查 ability_map。
 """
 import json
 import os
@@ -172,6 +176,11 @@ for h in heroes_raw:
 # 它们的英文名前缀同样属于某英雄，**不能**拿来推断归属，否则旧技能会混进筛选结果。
 
 # ---------------------------------------------------------------- 技能主表
+# 两类来源共用同一套池化逻辑：
+#   d['abilities'] = 英雄技能（不写 src，缺省即 'hero'）
+#   d['items']     = 物品技能（写 src='item'）
+# ⚠️ 物品技能的 id 与英雄技能**不是同一个编号空间**（都从 1 开始），
+#    所以物品技能绝不能去查 ability_map，否则会同号误挂到某个英雄名下。
 abilities = []
 feat_skills = 0
 note_skills = 0
@@ -180,16 +189,22 @@ cast_skills = 0
 map_by_field = 0
 map_none = 0
 
-for a in d['abilities']:
+rows_in = [(a, None) for a in d.get('abilities') or []]
+rows_in += [(a, 'item') for a in d.get('items') or []]
+
+for a, src in rows_in:
     b = {k: a.get(k, []) for k in ('i', 'n', 'en', 'd', 'g', 'm', 'e')}
 
-    # 所属英雄：仅取 ability_map（未被任何英雄登记 = 旧版本/废弃/通用条目）
-    hs = skill_hero.get(a.get('i'))
+    # 所属英雄：仅取 ability_map（未被任何英雄登记 = 旧版本/废弃/通用条目）；物品技能不参与
+    hs = None if src else skill_hero.get(a.get('i'))
     if hs:
         map_by_field += 1
         b['h'] = hs
-    else:
+    elif not src:
         map_none += 1
+
+    if src:
+        b['src'] = src
 
     raw = a.get('f') or []
     fidx = []
@@ -244,9 +259,11 @@ with open(DST, 'w', encoding='utf-8') as f:
     f.write(';')
 
 feat_items = sum(len(v) for v in feat_text.values())
-print('data.js 已生成：tags=%d abilities=%d 特性tag=%d 池槽=%d 引用=%d 带内容技能=%d '
+item_n = sum(1 for b in abilities if b.get('src') == 'item')
+print('data.js 已生成：tags=%d abilities=%d（英雄 %d / 物品 %d）特性tag=%d 池槽=%d 引用=%d 带内容技能=%d '
       '注释行池=%d 注释引用=%d 带注释技能=%d 带前摇技能=%d size=%.0f KB'
-      % (len(out['tags']), len(out['abilities']), len(feat_text), feat_items, refs[0], feat_skills,
+      % (len(out['tags']), len(out['abilities']), len(out['abilities']) - item_n, item_n,
+         len(feat_text), feat_items, refs[0], feat_skills,
          len(note_pool), note_line_refs, note_skills, cast_skills, os.path.getsize(DST) / 1024.0))
 print('英雄：%d 个（力量 %d / 敏捷 %d / 智力 %d / 全才 %d / 其他 %d）；技能归属（仅 ability_map）：有归属 %d / 无归属 %d'
       % (len(heroes_out),

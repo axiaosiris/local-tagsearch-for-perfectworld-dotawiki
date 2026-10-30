@@ -179,10 +179,16 @@ if (!heroTotal) {
   });
 }
 
-// ================= 技能来源筛选（数据类别；物品/非英雄单位技能待接入） =================
+// ================= 技能来源筛选（数据类别；物品技能已接入，非英雄单位技能待接入） =================
 console.log('\n[技能来源]');
 console.log('  登记表 = ' + core.SOURCES.map(function (s) { return s.key + (s.ready ? '' : '(未接入)'); }).join('、'));
 console.log('  数据里的来源 = ' + JSON.stringify(idx.sources) + '，条数 ' + JSON.stringify(idx.sourceCount));
+
+// 真实物品技能：id 与英雄技能不是同一编号空间，**必须没有英雄归属**（有 = 误查了 ability_map）
+var realItems = idx.abilities.filter(function (a) { return a.src === 'item'; });
+var itemWithHero = realItems.filter(function (a) { return a.h && a.h.length; });
+console.log('  真实物品技能 ' + realItems.length + ' 条；误挂英雄归属的 ' + itemWithHero.length + ' 条（应为 0）' +
+  (itemWithHero.length ? ' → ' + itemWithHero.slice(0, 3).map(function (a) { return a.i + ' ' + a.n; }).join('、') : ''));
 var readyKeys = core.SOURCES.filter(function (s) { return s.ready; }).map(function (s) { return s.key; });
 var baseQ = { and: ['防御塔'], or: [], not: [] };
 var rSrcAll = core.search(idx, { and: baseQ.and, or: [], not: [], sources: readyKeys });
@@ -193,7 +199,7 @@ console.log('  全勾来源 ' + rSrcAll.hits.length + ' 条（stats.src.on=' + r
 console.log('  注释检索带 sources：' + core.searchNotes(idx, { q: '粘滞', sources: readyKeys }).hits.length +
   ' 条（应 = 全库 ' + core.searchNotes(idx, { q: '粘滞' }).hits.length + '）');
 
-// 模拟接入「物品技能」：把 100 条**有效**技能标成 src:'item'，验证过滤与叠加
+// 模拟接入第三类来源：把 100 条**有效**技能标成 src:'creep'（验证登记表以外的 key 也能过滤、叠加）
 var pickItem = {};
 DB.abilities.filter(function (a) { return !core.excludeKind(a); }).slice(0, 100)
   .forEach(function (a) { pickItem[a.i] = 1; });
@@ -202,13 +208,13 @@ var fake = core.createIndex({
   abilities: DB.abilities.map(function (a) {
     if (!pickItem[a.i]) return a;
     var c = {}; for (var kk in a) if (Object.prototype.hasOwnProperty.call(a, kk)) c[kk] = a[kk];
-    c.src = 'item'; return c;
+    c.src = 'creep'; return c;
   })
 });
 console.log('  模拟数据来源 = ' + JSON.stringify(fake.sources) + '，条数 ' + JSON.stringify(fake.sourceCount));
-var fItem = core.search(fake, { and: [], or: [], not: [], sources: ['item'] });
+var fItem = core.search(fake, { and: [], or: [], not: [], sources: ['creep'] });
 var fHero = core.search(fake, { and: [], or: [], not: [], sources: ['hero'] });
-var fBoth = core.search(fake, { and: [], or: [], not: [], sources: ['hero', 'item'] });
-console.log('  只 item ' + fItem.hits.length + ' ｜只 hero ' + fHero.hits.length + ' ｜两者 ' + fBoth.hits.length +
+var fBoth = core.search(fake, { and: [], or: [], not: [], sources: ['hero', 'creep'] });
+console.log('  只 creep ' + fItem.hits.length + ' ｜只 hero ' + fHero.hits.length + ' ｜两者 ' + fBoth.hits.length +
   '（合计应 = 有效 ' + (fake.abilities.length - fake.excludedTotal) + '）');
-console.log('  只 item 的 stats.src = ' + JSON.stringify(fItem.stats.src));
+console.log('  只 creep 的 stats.src = ' + JSON.stringify(fItem.stats.src));

@@ -1,6 +1,8 @@
 // fetch_tagdb —— 抓取「Tag管理」全量标签 + 「技能」全量 tag 数据（供离线检索工具 tagsearch 使用）
 // 入参：无（A.compact=1 精简输出，默认 1）
-// 输出：{ ok, fetchedAt, tags:[{id,name,c1,c2}], abilities:[{i,n,en,d,g,m,f,e,cp}], heroes:[{i,zh,en,a,s}] }
+// 输出：{ ok, fetchedAt, tags:[{id,name,c1,c2}], abilities:[{i,n,en,d,g,m,f,e,cp}], items:[同上], heroes:[{i,zh,en,a,s}] }
+//   abilities = 「技能」（英雄技能）全量；items = 「内容管理-道具技能」全量，字段与 abilities 完全一致，
+//    构建阶段给 items 写 src='item'（abilities 不写 src，缺省即 'hero'）。
 //   heroes = 「内容管理-英雄数据」全量英雄（接口 /apg/admin/hero/list，POST {}）
 //     i=英雄 id  zh=中文名  en=英文名  a=主属性（力量/敏捷/智力/全才）  s=该英雄的技能 id 数组（ability_map）
 //   d=skill_detail(技能类型 id)  g=tags 字段 id  m=skill_mechanism(mechanism_tag id)
@@ -45,41 +47,57 @@
     return out;
   }
 
+  /** 单条技能记录（英雄技能 / 物品技能共用同一套字段）→ 精简结构 */
+  function pack(x) {
+    var eff = jarr(x.skill_effect).map(function (e) {
+      return { n: e.effect_input || '', t: ids(e.effect_tag) };
+    });
+    var mech = [];
+    var feat = [];
+    jarr(x.skill_mechanism).forEach(function (mm) {
+      var n = parseInt(mm.mechanism_tag, 10);
+      if (isNaN(n) || n <= 0) return;
+      mech.push(n);
+      // 特性内容（网页「技能特性」行的描述文本），与 mech 同序
+      feat.push({ i: n, c: String(mm.mechanism_input == null ? '' : mm.mechanism_input) });
+    });
+    return {
+      i: x.id,
+      n: x.name_zh || '',
+      en: x.name_en || '',
+      d: ids(x.skill_detail),
+      g: ids(x.tags),
+      m: mech,
+      f: feat,
+      e: eff,
+      note: String(x.skill_notes == null ? '' : x.skill_notes),
+      // 施法前摇（后台字段 ability_cast_point；注意 _back 后缀的是「施法后摇」）
+      cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim()
+    };
+  }
+
   var abs = [], pages = 0;
-  for (var p2 = 1; p2 <= 20; p2++) {
+  for (var p2 = 1; p2 <= 40; p2++) {
     var r2 = await fetch('/apg/admin/hero/ability?page=' + p2, { credentials: 'include' });
     var j2 = await r2.json();
     var L2 = (j2.data && j2.data.list) || [];
     pages = p2;
     if (!L2.length) break;
-    L2.forEach(function (x) {
-      var eff = jarr(x.skill_effect).map(function (e) {
-        return { n: e.effect_input || '', t: ids(e.effect_tag) };
-      });
-      var mech = [];
-      var feat = [];
-      jarr(x.skill_mechanism).forEach(function (mm) {
-        var n = parseInt(mm.mechanism_tag, 10);
-        if (isNaN(n) || n <= 0) return;
-        mech.push(n);
-        // 特性内容（网页「技能特性」行的描述文本），与 mech 同序
-        feat.push({ i: n, c: String(mm.mechanism_input == null ? '' : mm.mechanism_input) });
-      });
-      abs.push({
-        i: x.id,
-        n: x.name_zh || '',
-        en: x.name_en || '',
-        d: ids(x.skill_detail),
-        g: ids(x.tags),
-        m: mech,
-        f: feat,
-        e: eff,
-        note: String(x.skill_notes == null ? '' : x.skill_notes),
-        // 施法前摇（后台字段 ability_cast_point；注意 _back 后缀的是「施法后摇」）
-        cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim()
-      });
-    });
+    L2.forEach(function (x) { abs.push(pack(x)); });
     if (L2.length < 100) break;
+  }
+
+  // ---------- 2b) 物品技能全量（内容管理-道具技能；字段同英雄技能） ----------
+  // 构建阶段给这批记录写 src='item'（英雄技能不写 src，缺省即 'hero'）。
+  var items = [], ipages = 0;
+  for (var p3 = 1; p3 <= 20; p3++) {
+    var r3 = await fetch('/apg/admin/item/ability?page=' + p3 + '&page_size=100', { credentials: 'include' });
+    var j3 = await r3.json();
+    var L3 = (j3.data && j3.data.list) || [];
+    ipages = p3;
+    if (!L3.length) break;
+    L3.forEach(function (x) { items.push(pack(x)); });
+    if (L3.length < 100) break;
   }
 
   // ---------- 3) 英雄全量（内容管理-英雄数据；能力清单在 ability_map） ----------
@@ -109,10 +127,13 @@
     fetchedAt: new Date().toISOString(),
     tagCount: tags.length,
     abilityCount: abs.length,
+    itemCount: items.length,
     heroCount: heroes.length,
     pages: pages,
+    itemPages: ipages,
     tags: tags,
     abilities: abs,
+    items: items,
     heroes: heroes
   });
 })()

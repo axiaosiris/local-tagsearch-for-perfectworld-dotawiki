@@ -157,20 +157,21 @@ def refresh() -> dict:
             say('✗ ' + why)
             return {'ok': False, 'error': why, 'log': log}
 
-        info = {'fetchedAt': '', 'tags': 0, 'abilities': 0, 'sizeKB': 0}
+        info = {'fetchedAt': '', 'tags': 0, 'abilities': 0, 'items': 0, 'sizeKB': 0}
         try:
             with open(RAW, 'r', encoding='utf-8') as f:
                 d = json.load(f)
             info['fetchedAt'] = d.get('fetchedAt', '')
             info['tags'] = len(d.get('tags') or [])
             info['abilities'] = len(d.get('abilities') or [])
+            info['items'] = len(d.get('items') or [])
             info['sizeKB'] = round(os.path.getsize(DATA_JS) / 1024.0, 1)
         except Exception as e:                               # noqa: BLE001
             say('（读取统计失败：%s）' % e)
 
         ms = int((time.time() - t0) * 1000)
-        say('✓ 完成：tag %d 条 / 技能 %d 条 / data.js %.0f KB，用时 %.1fs'
-            % (info['tags'], info['abilities'], info['sizeKB'], ms / 1000.0))
+        say('✓ 完成：tag %d 条 / 英雄技能 %d 条 / 物品技能 %d 条 / data.js %.0f KB，用时 %.1fs'
+            % (info['tags'], info['abilities'], info['items'], info['sizeKB'], ms / 1000.0))
         info.update({'ok': True, 'ms': ms, 'log': log})
         _STATE['last'] = info
         return info

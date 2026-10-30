@@ -265,7 +265,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         <div class="srclist" id="srcList"></div>
         <div class="tip" style="margin:0">
           只检索勾选的<b>技能来源</b>（多选 = 并集），与 tag / 施法前摇条件同时生效。
-          目前数据里只有<b>现版本英雄技能</b>一类；物品技能、非英雄单位技能接入后会自动出现在这里。
+          目前有<b>现版本英雄技能</b>与<b>物品技能</b>两类；非英雄单位技能接入后会自动出现在这里。
         </div>
       </div>
     </div>
@@ -444,7 +444,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
 <!-- BKMK_BEGIN -->
 <!-- 抓取书签代码：由 scripts/build_bookmarklet.py 从
      scripts/fetch_tagdb.bookmarklet.js 生成，请勿手改本块 -->
-<script type="text/plain" id="bkmkSrc">(async function () { 'use strict'; var D = document; if (!/^partner\.dota2\.com\.cn$/i.test(location.hostname)) { alert('请先在已登录的 partner.dota2.com.cn 后台页面使用本抓取书签。'); return; } var box = D.getElementById('__tsbkBox'); if (!box) { box = D.createElement('div'); box.id = '__tsbkBox'; box.setAttribute('style', 'position:fixed;right:18px;bottom:18px;z-index:2147483647;width:336px;' + 'background:#101418;color:#e8eef5;border:1px solid #2c3946;border-radius:10px;padding:12px 14px;' + 'font:13px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.45)'); D.body.appendChild(box); } function paint(title, body, ok) { box.innerHTML = '<div style="font-weight:600;color:' + (ok === false ? '#ff9d9d' : ok ? '#8fe3a8' : '#cfe3ff') + ';margin-bottom:4px">' + title + '</div><div style="opacity:.85">' + body + '</div>'; } function step(t) { paint('正在抓取后台数据…', t); } step('准备中…'); function jarr(v) { if (v == null || v === '') return []; if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return []; } function ids(v) { if (v == null || v === '') return []; var out = [], arr = jarr(v); if (arr.length) { arr.forEach(function (x) { var n = parseInt(x, 10); if (!isNaN(n) && n > 0) out.push(n); }); return out; } if (typeof v === 'string') { v.split(',').forEach(function (t) { var n = parseInt(t, 10); if (!isNaN(n) && n > 0) out.push(n); }); } return out; } function getJSON(url, opt) { var o = opt || { credentials: 'include' }; if (!o.credentials) o.credentials = 'include'; return fetch(url, o).then(function (r) { if (r.status === 401 || r.status === 403) throw new Error('未登录或登录已过期（HTTP ' + r.status + '）'); if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + url); return r.json(); }).then(function (j) { if (j && typeof j.code === 'number' && j.code !== 0) { throw new Error('接口返回 code=' + j.code + (j.msg ? '（' + j.msg + '）' : '') + ' —— 请确认已登录后台'); } return j; }); } try { var tags = []; for (var p = 1; p <= 50; p++) { step('Tag 第 ' + p + ' 页…（已 ' + tags.length + ' 条）'); var j = await getJSON('/apg/admin/mechanism/list?page=' + p); var L = (j.data && j.data.list) || (j.data && j.data.data) || []; if (!L.length) break; L.forEach(function (t) { tags.push({ id: t.id, name: t.name, c1: t.cate1 || '', c2: t.cate2 || '', sort: t.sort, pid: t.pid }); }); } var abs = [], pages = 0; for (var p2 = 1; p2 <= 50; p2++) { step('技能第 ' + p2 + ' 页…（已 ' + abs.length + ' 条 / Tag ' + tags.length + '）'); var j2 = await getJSON('/apg/admin/hero/ability?page=' + p2); var L2 = (j2.data && j2.data.list) || []; pages = p2; if (!L2.length) break; L2.forEach(function (x) { var eff = jarr(x.skill_effect).map(function (e) { return { n: e.effect_input || '', t: ids(e.effect_tag) }; }); var mech = [], feat = []; jarr(x.skill_mechanism).forEach(function (mm) { var n = parseInt(mm.mechanism_tag, 10); if (isNaN(n) || n <= 0) return; mech.push(n); feat.push({ i: n, c: String(mm.mechanism_input == null ? '' : mm.mechanism_input) }); }); abs.push({ i: x.id, n: x.name_zh || '', en: x.name_en || '', d: ids(x.skill_detail), g: ids(x.tags), m: mech, f: feat, e: eff, note: String(x.skill_notes == null ? '' : x.skill_notes), cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim() }); }); } var heroes = []; try { step('英雄名册…（技能已 ' + abs.length + ' 条）'); var jh = await getJSON('/apg/admin/hero/list', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }); var LH = Array.isArray(jh.data) ? jh.data : ((jh.data && jh.data.list) || []); LH.forEach(function (h) { heroes.push({ i: h.id, zh: h.name_zh || '', en: h.name_en || '', a: h.attribute_primary || '', s: ids(h.ability_map) }); }); } catch (e) { heroes = []; } if (!tags.length || !abs.length) throw new Error('抓到的数据为空 —— 请确认已登录后台并有编辑权限'); step('生成文件…'); var payload = { ok: true, fetchedAt: new Date().toISOString(), tagCount: tags.length, abilityCount: abs.length, heroCount: heroes.length, pages: pages, tags: tags, abilities: abs, heroes: heroes }; var txt = JSON.stringify(payload); var sizeKB = Math.round(txt.length / 1024); var url = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); var a = D.createElement('a'); a.href = url; a.download = '_raw.json'; a.style.display = 'none'; D.body.appendChild(a); a.click(); D.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 30000); paint('✓ 已下载 _raw.json（' + sizeKB + ' KB）', 'Tag ' + tags.length + ' 条 · 技能 ' + abs.length + ' 条 · 英雄 ' + heroes.length + ' 个<br>' + '下一步：打开检索器 → 右上角「⟳ 更新本地数据」→「选择文件载入…」→ 选刚下载的 _raw.json' + '<br><span style="opacity:.6">本浮层不会自动关闭，可手动关掉浏览器标签或刷新页面。</span>', true); } catch (e) { paint('✗ 抓取失败', (e && e.message ? e.message : String(e)) + '<br><span style="opacity:.7">若提示未登录，请先登录后台再点书签；' + '若书签被浏览器拦截（CSP），可在后台页按 F12 打开控制台，把书签代码粘贴进去回车。</span>', false); } })();</script>
+<script type="text/plain" id="bkmkSrc">(async function () { 'use strict'; var D = document; if (!/^partner\.dota2\.com\.cn$/i.test(location.hostname)) { alert('请先在已登录的 partner.dota2.com.cn 后台页面使用本抓取书签。'); return; } var box = D.getElementById('__tsbkBox'); if (!box) { box = D.createElement('div'); box.id = '__tsbkBox'; box.setAttribute('style', 'position:fixed;right:18px;bottom:18px;z-index:2147483647;width:336px;' + 'background:#101418;color:#e8eef5;border:1px solid #2c3946;border-radius:10px;padding:12px 14px;' + 'font:13px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.45)'); D.body.appendChild(box); } function paint(title, body, ok) { box.innerHTML = '<div style="font-weight:600;color:' + (ok === false ? '#ff9d9d' : ok ? '#8fe3a8' : '#cfe3ff') + ';margin-bottom:4px">' + title + '</div><div style="opacity:.85">' + body + '</div>'; } function step(t) { paint('正在抓取后台数据…', t); } step('准备中…'); function jarr(v) { if (v == null || v === '') return []; if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return []; } function ids(v) { if (v == null || v === '') return []; var out = [], arr = jarr(v); if (arr.length) { arr.forEach(function (x) { var n = parseInt(x, 10); if (!isNaN(n) && n > 0) out.push(n); }); return out; } if (typeof v === 'string') { v.split(',').forEach(function (t) { var n = parseInt(t, 10); if (!isNaN(n) && n > 0) out.push(n); }); } return out; } function pack(x) { var eff = jarr(x.skill_effect).map(function (e) { return { n: e.effect_input || '', t: ids(e.effect_tag) }; }); var mech = [], feat = []; jarr(x.skill_mechanism).forEach(function (mm) { var n = parseInt(mm.mechanism_tag, 10); if (isNaN(n) || n <= 0) return; mech.push(n); feat.push({ i: n, c: String(mm.mechanism_input == null ? '' : mm.mechanism_input) }); }); return { i: x.id, n: x.name_zh || '', en: x.name_en || '', d: ids(x.skill_detail), g: ids(x.tags), m: mech, f: feat, e: eff, note: String(x.skill_notes == null ? '' : x.skill_notes), cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim() }; } function getJSON(url, opt) { var o = opt || { credentials: 'include' }; if (!o.credentials) o.credentials = 'include'; return fetch(url, o).then(function (r) { if (r.status === 401 || r.status === 403) throw new Error('未登录或登录已过期（HTTP ' + r.status + '）'); if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + url); return r.json(); }).then(function (j) { if (j && typeof j.code === 'number' && j.code !== 0) { throw new Error('接口返回 code=' + j.code + (j.msg ? '（' + j.msg + '）' : '') + ' —— 请确认已登录后台'); } return j; }); } try { var tags = []; for (var p = 1; p <= 50; p++) { step('Tag 第 ' + p + ' 页…（已 ' + tags.length + ' 条）'); var j = await getJSON('/apg/admin/mechanism/list?page=' + p); var L = (j.data && j.data.list) || (j.data && j.data.data) || []; if (!L.length) break; L.forEach(function (t) { tags.push({ id: t.id, name: t.name, c1: t.cate1 || '', c2: t.cate2 || '', sort: t.sort, pid: t.pid }); }); } var abs = [], pages = 0; for (var p2 = 1; p2 <= 50; p2++) { step('技能第 ' + p2 + ' 页…（已 ' + abs.length + ' 条 / Tag ' + tags.length + '）'); var j2 = await getJSON('/apg/admin/hero/ability?page=' + p2); var L2 = (j2.data && j2.data.list) || []; pages = p2; if (!L2.length) break; L2.forEach(function (x) { abs.push(pack(x)); }); } var items = [], ipages = 0; for (var p3 = 1; p3 <= 30; p3++) { step('物品技能第 ' + p3 + ' 页…（已 ' + items.length + ' 条 / 技能 ' + abs.length + ' 条）'); var j3 = await getJSON('/apg/admin/item/ability?page=' + p3 + '&page_size=100'); var L3 = (j3.data && j3.data.list) || []; ipages = p3; if (!L3.length) break; L3.forEach(function (x) { items.push(pack(x)); }); if (L3.length < 100) break; } var heroes = []; try { step('英雄名册…（技能已 ' + abs.length + ' 条）'); var jh = await getJSON('/apg/admin/hero/list', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }); var LH = Array.isArray(jh.data) ? jh.data : ((jh.data && jh.data.list) || []); LH.forEach(function (h) { heroes.push({ i: h.id, zh: h.name_zh || '', en: h.name_en || '', a: h.attribute_primary || '', s: ids(h.ability_map) }); }); } catch (e) { heroes = []; } if (!tags.length || !abs.length) throw new Error('抓到的数据为空 —— 请确认已登录后台并有编辑权限'); step('生成文件…'); var payload = { ok: true, fetchedAt: new Date().toISOString(), tagCount: tags.length, abilityCount: abs.length, itemCount: items.length, heroCount: heroes.length, pages: pages, itemPages: ipages, tags: tags, abilities: abs, items: items, heroes: heroes }; var txt = JSON.stringify(payload); var sizeKB = Math.round(txt.length / 1024); var url = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); var a = D.createElement('a'); a.href = url; a.download = '_raw.json'; a.style.display = 'none'; D.body.appendChild(a); a.click(); D.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 30000); paint('✓ 已下载 _raw.json（' + sizeKB + ' KB）', 'Tag ' + tags.length + ' 条 · 技能 ' + abs.length + ' 条 · 英雄 ' + heroes.length + ' 个<br>' + '下一步：打开检索器 → 右上角「⟳ 更新本地数据」→「选择文件载入…」→ 选刚下载的 _raw.json' + '<br><span style="opacity:.6">本浮层不会自动关闭，可手动关掉浏览器标签或刷新页面。</span>', true); } catch (e) { paint('✗ 抓取失败', (e && e.message ? e.message : String(e)) + '<br><span style="opacity:.7">若提示未登录，请先登录后台再点书签；' + '若书签被浏览器拦截（CSP），可在后台页按 F12 打开控制台，把书签代码粘贴进去回车。</span>', false); } })();</script>
 <!-- BKMK_END -->
 
 <script src="data.js"></script>
@@ -519,7 +519,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   }
 
   // ---------- 技能筛选（按数据来源；登记表见 search-core.js 的 SOURCES） ----------
-  // 目前数据里只有「现版本英雄技能」一类；物品技能 / 非英雄单位技能接入后，
+  // 现已有「现版本英雄技能」「物品技能」两类；其余来源接入后，
   // 在登记表里把对应条目的 ready 改成 true，这里就会自动多出一个勾选项。
   var SRC_READY = core.SOURCES.filter(function (s) { return s.ready; });
   var srcSel = new Set(SRC_READY.map(function (s) { return s.key; }));   // 默认全勾
@@ -632,8 +632,10 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
 
   function readHeroes() { return Array.from(heroSel); }
 
-  /** 结果表「技能」格下的英雄行（无归属则不显示） */
+  /** 结果表「技能」格下的英雄行（无归属则不显示）；非英雄来源改为显示来源名（如「物品技能」） */
   function heroLine(h) {
+    var key = String((h && h.ability && h.ability.src) || 'hero');
+    if (key !== 'hero') return '<div class="hr">' + esc(srcMeta(key).label) + '</div>';
     var hs = h && h.heroes;
     if (!hs || !hs.length) return '';
     return '<div class="hr">' + esc(heroNames(hs.map(function (x) { return x.id; }), 3)) + '</div>';
@@ -945,7 +947,9 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       // 每个技能 = 一个不可拆分的块（升级图标 + 技能名），整体随流换行
       html += '<div class="cmpgrid">';
       list.forEach(function (h, i) {
-        var hn = (h.heroes || []).length ? '　英雄：' + heroNames(h.heroes.map(function (x) { return x.id; }), 3) : '';
+        var hn = (h.heroes || []).length ? '　英雄：' + heroNames(h.heroes.map(function (x) { return x.id; }), 3)
+          : (String((h.ability && h.ability.src) || 'hero') !== 'hero'
+            ? '　来源：' + srcLabel(String((h.ability && h.ability.src) || 'hero')) : '');
         html += '<div class="cmitem' + (h.excluded ? ' ex' : '') + '" title="' +
           esc((h.name || '(无名)') + '　#' + h.id + hn + '　点击查看详情') + '">' +
           '<span class="cmup">' + iconOnly(h.upgrades) + '</span>' +
@@ -1076,7 +1080,9 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     if (viewMode === 'compact') {
       html += '<div class="cmpgrid">';
       list.forEach(function (h, i) {
-        var hn = (h.heroes || []).length ? '　英雄：' + heroNames(h.heroes.map(function (x) { return x.id; }), 3) : '';
+        var hn = (h.heroes || []).length ? '　英雄：' + heroNames(h.heroes.map(function (x) { return x.id; }), 3)
+          : (String((h.ability && h.ability.src) || 'hero') !== 'hero'
+            ? '　来源：' + srcLabel(String((h.ability && h.ability.src) || 'hero')) : '');
         html += '<div class="cmitem' + (h.excluded ? ' ex' : '') + '" title="' +
           esc((h.name || '(无名)') + '　#' + h.id + hn + '　命中 ' + h.matched + ' 行　点击查看详情') + '">' +
           '<span class="cmup">' + iconOnly(h.upgrades) + '</span>' +
@@ -1147,6 +1153,11 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   // ---------- 技能详情 ----------
   /** 详情弹窗的「所属英雄」段 */
   function heroSec(h) {
+    var key = String((h && h.ability && h.ability.src) || 'hero');
+    if (key !== 'hero') {
+      return '<div class="sec"><h4>技能来源</h4><span class="chip">' + esc(srcMeta(key).label) +
+        '</span><span class="count" style="margin-left:8px">该来源没有英雄归属</span></div>';
+    }
     var hs = (h && h.heroes) || [];
     if (!hs.length) return '<div class="sec"><h4>所属英雄</h4><span class="count">（无英雄归属：通用天赋 / 历史残留条目）</span></div>';
     return '<div class="sec"><h4>所属英雄</h4>' + hs.map(function (x) {
@@ -1580,34 +1591,41 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       }
     }
 
-    var src = d.abilities || [], out = [];
-    for (var n = 0; n < src.length; n++) {
-      var a = src[n] || {};
-      var b = { i: a.i, n: a.n, en: a.en, d: a.d || [], g: a.g || [], m: a.m || [], e: a.e || [] };
-      var hs = skillHero[a.i];
-      if (hs && hs.length) b.h = hs;
+    /* 两类来源共用同一套池化：abilities = 英雄技能（不写 src，缺省 'hero'）；
+     * items = 物品技能（写 src:'item'）。物品技能 id 与英雄技能不是同一编号空间，不查 ability_map。 */
+    var out = [];
+    function pushList(list, srcKey) {
+      for (var n = 0; n < list.length; n++) {
+        var a = list[n] || {};
+        var b = { i: a.i, n: a.n, en: a.en, d: a.d || [], g: a.g || [], m: a.m || [], e: a.e || [] };
+        var hs = srcKey ? null : skillHero[a.i];
+        if (hs && hs.length) b.h = hs;
+        if (srcKey) b.src = srcKey;
 
-      var rawF = a.f || [], fidx = [];
-      for (var q = 0; q < rawF.length; q++) {
-        var it = rawF[q];
-        if (!it || typeof it !== 'object') { fidx.push(-1); continue; }
-        var tid = parseInt(it.i, 10) || 0;
-        var c = String(it.c == null ? '' : it.c).trim();
-        fidx.push((tid > 0 && c) ? featSlot(tid, c) : -1);
+        var rawF = a.f || [], fidx = [];
+        for (var q = 0; q < rawF.length; q++) {
+          var it = rawF[q];
+          if (!it || typeof it !== 'object') { fidx.push(-1); continue; }
+          var tid = parseInt(it.i, 10) || 0;
+          var c = String(it.c == null ? '' : it.c).trim();
+          fidx.push((tid > 0 && c) ? featSlot(tid, c) : -1);
+        }
+        if (fidx.length) b.f = fidx;
+
+        var lines = noteLines(a.note);
+        if (lines.length) {
+          b.nt = lines.map(function (x) { return noteSlot(x.text); });
+          var inds = lines.map(function (x) { return x.ind; });
+          if (inds.some(function (x) { return !!x; })) b.ni = inds;
+        }
+
+        var cp = String(a.cp == null ? '' : a.cp).trim();
+        if (cp) b.cp = cp;
+        out.push(b);
       }
-      if (fidx.length) b.f = fidx;
-
-      var lines = noteLines(a.note);
-      if (lines.length) {
-        b.nt = lines.map(function (x) { return noteSlot(x.text); });
-        var inds = lines.map(function (x) { return x.ind; });
-        if (inds.some(function (x) { return !!x; })) b.ni = inds;
-      }
-
-      var cp = String(a.cp == null ? '' : a.cp).trim();
-      if (cp) b.cp = cp;
-      out.push(b);
     }
+    pushList(d.abilities || [], null);
+    pushList(d.items || [], 'item');
 
     return {
       fetchedAt: d.fetchedAt || '',

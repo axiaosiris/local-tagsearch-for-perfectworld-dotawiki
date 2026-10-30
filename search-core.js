@@ -35,13 +35,14 @@
 
   /* ---------- 默认排除的非技能条目 ----------
    * 这三类不是正常技能条目，检索时默认跳过（可在界面勾选「包含被排除项」临时放回）：
-   *   noUse  —— 废弃条目：名称含「废」（如「贪魔的贪婪（废）」）
+   *   noUse  —— 废弃条目：名称带「（废）」标记（如「贪魔的贪婪（废）」）；⚠️ 不能只判「含废字」，
+   *             物品技能里有正常的「残废」会被误伤
    *   custom —— 自定义技能：id ≥ 20000（站内「自」标条目，非官方技能）
    *   junk   —— 公式残条：名称以「-{」开头（数据里残留的模板片段，如「-{s:value}秒 雪球冷却」）
    * 互斥判定，按上述顺序取第一个命中项，故各类计数之和 = 被排除总数。 */
   var CUSTOM_ID_MIN = 20000;
   var EXCLUDE_KINDS = [
-    { key: 'noUse', label: '废弃条目', tip: '名称含「废」' },
+    { key: 'noUse', label: '废弃条目', tip: '名称带「（废）」标记' },
     { key: 'custom', label: '自定义技能', tip: 'id ≥ ' + CUSTOM_ID_MIN },
     { key: 'junk', label: '公式残条', tip: '名称以「-{」开头' }
   ];
@@ -50,7 +51,9 @@
   function excludeKind(a) {
     if (!a) return null;
     var n = String(a.n == null ? '' : a.n);
-    if (n.indexOf('废') >= 0) return 'noUse';
+    // 只认「（废）」这个后台标记（如「贪魔的贪婪（废）」）——
+    // 不能只看含「废」字：物品技能里有正常的「残废」，会被误判成废弃条目
+    if (/[（(]废/.test(n)) return 'noUse';
     if (n.indexOf('-{') === 0) return 'junk';
     if (a.i >= CUSTOM_ID_MIN) return 'custom';
     return null;
@@ -66,8 +69,8 @@
   var SOURCES = [
     { key: 'hero', label: '现版本英雄技能', ready: true,
       tip: '后台「英雄数据 → 人工处理数据 → 技能」的现版本技能（含技能总表里残留的旧版本条目）' },
-    { key: 'item', label: '物品技能', ready: false,
-      tip: '物品附带的技能（如散华、赤红甲的主动）——数据尚未接入' },
+    { key: 'item', label: '物品技能', ready: true,
+      tip: '道具附带的技能（后台「内容管理 → 道具技能」），与英雄技能共用同一套标签；无英雄归属' },
     { key: 'creep', label: '非英雄单位技能', ready: false,
       tip: '野怪 / 小兵 / 召唤物 / Boss 的技能——数据尚未接入' }
   ];
