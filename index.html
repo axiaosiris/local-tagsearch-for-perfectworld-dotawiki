@@ -96,6 +96,8 @@ td.en{color:#9aa4b2;font-size:11.5px;word-break:break-all}
   padding:1px 7px;margin:0 5px 5px 0;font-size:12px;line-height:1.75}
 .chip.and{border-color:#cddffd;background:#f2f7ff}
 .chip.or{border-color:#c9e9d5;background:#f2fbf5}
+/* 命中单元（同效果匹配时：这些 tag 落在同一个效果 / 位置里） */
+.chip.unit{border-color:#f0d9a8;background:#fff7e6;color:#8a5a00;font-weight:600}
 .chip .loc{color:var(--sub);font-size:11px}
 /* 技能特性命中时，chip 内追加该特性的内容（详细展示用） */
 .chip .feat{display:block;margin-top:2px;padding-top:2px;border-top:1px dashed var(--chipb);
@@ -136,6 +138,8 @@ tr.ex td.nm{font-style:italic}
 .expr .p.cp{background:#7c8fa6}
 .expr .p.hp{background:#8e7cc3}
 .expr .p.src{background:#0f9d58}
+.expr .p.unit{background:#b07d00}
+.expr .p.anyk{background:#8a94a2}
 .expr .join{font-weight:700;color:var(--sub);margin:0 5px}
 .expr code{background:#fff;border:1px solid var(--line);border-radius:4px;padding:0 4px;
   font:11.5px/1.6 ui-monospace,Consolas,Menlo,monospace}
@@ -316,6 +320,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
           </div>
         </div>
 
+        <label class="fuzzy"><input type="checkbox" id="matchUnit" checked> <span class="fz"><b>同一效果内匹配</b>：<b>且 / 或 / 非</b> 必须在<b>同一个技能效果</b>（或同一处技能类型 / tags 字段 / 技能特性）里同时成立 —— 不会把「效果2 有 A、效果1 有 B」凑成命中。取消勾选 = 旧口径（整个技能的 tag 合起来判断）</span></label>
         <label class="fuzzy"><input type="checkbox" id="fuzzy"> 模糊匹配：输入子串匹配全部同名/含该词的 tag（如「防御塔」→ 友方/敌方防御塔）</label>
         <label class="fuzzy"><input type="checkbox" id="showEx"> <span class="fz">包含被排除项：默认不检索 <b>废弃条目</b>（名含「废」）、<b>自定义技能</b>（id ≥ 20000）、<b>公式残条</b>（名以「-{」开头）</span></label>
 
@@ -327,6 +332,8 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         </div>
         <div class="tip">
           三类可<b>任意组合、同时生效</b>：命中 =（<b>且</b> 全部满足）<b>且</b>（<b>或</b> 至少一项）<b>且</b>（<b>非</b> 一个都不满足）。
+          默认按<b>同一效果内</b>判断（勾选项可关）——「且」的多项必须在<b>同一个效果</b>里同时出现，
+          不会出现「A 在效果1、B 在效果2」也算命中；「或」「非」同理。
           上方「当前条件」会实时显示最终表达式。输入 tag 名称时会自动补全；若名称有多档（如「友方防御塔」含 目标/神杖/魔晶/天赋），命中任一档即算包含。
         </div>
       </div>
@@ -756,6 +763,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     var q = {
       and: collect('and'), or: collect('or'), not: collect('not'),
       scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
+      matchUnit: $('matchUnit').checked,
       cast: castOn ? { min: cast.min, max: cast.max } : null,
       heroes: heroes, sources: sources
     };
@@ -896,13 +904,19 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
           '</b> 条。如需查看，请勾选左侧「包含被排除项」。</div>';
       }
     }
+    if (r.stats && r.stats.unit && r.stats.unit.on && r.stats.unit.out) {
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>同一效果内匹配</b>：另有 <b>' +
+        r.stats.unit.out + '</b> 条技能虽然含全部 tag，但它们分散在不同效果 / 位置上（例如 A 在效果1、B 在效果2），' +
+        '未计入结果。取消左侧「同一效果内匹配」可改回「整技能合并判断」。</div>';
+    }
     if (r.stats && r.stats.not && r.stats.not.on) {
       var nt = r.stats.not;
-      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>反选</b>排除含 ' +
-        nt.names.map(function (x) { return '「<b>' + esc(x) + '</b>」'; }).join('、') +
-        ' 的技能 <b>' + nt.out + '</b> 条' +
-        (nt.names.length > 1 ? '（任一命中即排除）' : '') +
-        (nt.afterTag != null ? '，余 <b>' + nt.afterTag + '</b> 条参加后续筛选' : '') + '。</div>';
+      var nmTxt = nt.names.map(function (x) { return '「<b>' + esc(x) + '</b>」'; }).join('、');
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>反选</b>剔除 <b>' + nt.out + '</b> 条 —— ' +
+        (nt.unit
+          ? '命中的那个效果 / 位置里出现 ' + nmTxt + ' 即不算命中'
+          : '技能里出现 ' + nmTxt + ' 即整条剔除（任一命中即排除）') +
+        (nt.afterTag != null ? '；余 <b>' + nt.afterTag + '</b> 条参加后续筛选' : '') + '。</div>';
     }
     if (r.stats && r.stats.cast && r.stats.cast.on) {
       var c = r.stats.cast;
@@ -963,6 +977,12 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         '<th style="width:52px"></th></tr></thead><tbody>';
       list.forEach(function (h, i) {
         var featSeen = {};
+        // 命中单元：同效果匹配时，标明这些 tag 是在同一处成立的
+        var uLabels = h.unitLabels || [];
+        var unitChip = uLabels.length
+          ? '<span class="chip unit" title="这些条件是在同一个判定单元里同时成立的">同单元 · ' +
+            esc(uLabels.slice(0, 3).join(' / ')) + (uLabels.length > 3 ? ' …' : '') + '</span>'
+          : '';
         var chips = h.detail.map(function (d) {
           var locs = d.loc.map(function (l) { return esc(l.where); }).join(' / ');
           // 命中技能特性 → 展示特性内容（同一特性只显示一次）
@@ -984,7 +1004,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
           heroLine(h) + '</td>' +
           '<td class="id">' + h.id + '</td>' +
           '<td class="cpcell">' + (h.cast ? esc(h.cast) : '<span class="count">—</span>') + '</td>' +
-          '<td>' + chips + '</td>' +
+          '<td>' + unitChip + chips + '</td>' +
           '<td class="count">' + h.tagCount + '</td>' +
           '<td><button class="btn link" data-detail="' + i + '">详情</button></td>' +
           '</tr>';
@@ -1306,7 +1326,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   }
 
   function csvTag() {
-    var rows = [['升级项', '技能名', '技能ID', '英文名', '英雄', '施法前摇', '升级项（占位符）', '命中条件', 'tag总数', '排除原因']];
+    var rows = [['升级项', '技能名', '技能ID', '英文名', '英雄', '施法前摇', '升级项（占位符）', '命中条件', 'tag总数', '命中单元', '排除原因']];
     S.tag.result.hits.forEach(function (h) {
       var cond = h.detail.map(function (d) {
         return (d.group === 'and' ? '且:' : '或:') + d.name + '@' +
@@ -1316,7 +1336,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       var nq = (S.tag.query && S.tag.query.not) || [];
       if (nq.length) cond = (cond ? cond + ' | ' : '') + nq.map(function (x) { return '非:' + x; }).join(' | ');
       rows.push([upNames(h.upgrades), h.name, h.id, h.en, heroCsv(h), h.cast || '', upPh(h.upgrades), cond, h.tagCount,
-        h.excluded ? (EXLABEL[h.excluded] || h.excluded) : '']);
+        (h.unitLabels || []).join('/'), h.excluded ? (EXLABEL[h.excluded] || h.excluded) : '']);
     });
     downloadCsv(rows, 'tagsearch-tag');
   }
@@ -1731,6 +1751,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       var q = {
         and: collect('and'), or: collect('or'), not: collect('not'),
         scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
+        matchUnit: $('matchUnit').checked,
         cast: (min == null && max == null) ? null : { min: min, max: max },
         heroes: readHeroes(), sources: readSources()
       };
@@ -1741,6 +1762,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       var q = {
         and: collect('and'), or: collect('or'), not: collect('not'),
         scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
+        matchUnit: $('matchUnit').checked,
         cast: null, heroes: ids || [], sources: readSources()
       };
       return core.search(idx, q);
@@ -1750,6 +1772,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       var q = {
         and: collect('and'), or: collect('or'), not: collect('not'),
         scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
+        matchUnit: $('matchUnit').checked,
         cast: null, heroes: readHeroes(), sources: keys || []
       };
       return core.search(idx, q);
@@ -1845,8 +1868,11 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     var ww = (o.length === 1)
       ? '<span class="ww">⚠ 「或」只填了 1 项 —— 此时它等价于「且」（必须包含该项），不构成「或」。「或」至少需要 2 项。</span>'
       : '';
+    var unitOn = $('matchUnit') ? $('matchUnit').checked : true;
+    var uSeg = '<span class="p ' + (unitOn ? 'unit' : 'anyk') + '">' +
+      (unitOn ? '同一效果内' : '整技能合并') + '</span>';
     e.innerHTML = seg.length
-      ? '<span class="lb">当前条件：</span>' + seg.join(' <span class="join">且</span> ') + ww
+      ? '<span class="lb">当前条件：</span>' + uSeg + seg.join(' <span class="join">且</span> ') + ww
       : '<span class="dim">当前条件：（未设置）</span>';
   }
   // 用事件委托统一刷新（输入、增删行、清空都覆盖）
@@ -1885,6 +1911,8 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   $('fuzzy').addEventListener('change', function () { revalidateAll(true); });
   // 「包含被排除项」勾选后立即用同一条件重跑（若已有检索结果）
   $('showEx').addEventListener('change', function () { if (S.tag) runTag(); });
+  // 切换匹配粒度（同一效果内 / 整技能合并）同样立即重跑
+  $('matchUnit').addEventListener('change', function () { updateExpr(); if (S.tag) runTag(); });
 
   // ---------- 注释检索的交互 ----------
   $('btnRunN').addEventListener('click', runNote);

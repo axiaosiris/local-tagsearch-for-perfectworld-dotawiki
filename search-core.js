@@ -8,6 +8,12 @@
  *   and: [tagName…] 必须全部包含（且）
  *   or : [tagName…] 至少包含其一（或）——为空则不参与判断
  *   not: [tagName…] 全部不得包含（反选/排除）
+ *   matchUnit: 匹配粒度（默认 true）——true = **同一单元内**成立才算命中：
+ *        一个技能的 tag 分散在「技能类型 / tags 字段 / 每条技能特性 / 每个技能效果行」里，
+ *        且/或/非 必须在**同一个单元**里同时成立，而不是把整个技能的 tag 合起来凑。
+ *        例：且=[弱驱散, 眩晕] → 只命中「某个效果里同时有这两个 tag」的技能；
+ *        「效果2有弱驱散、效果1有眩晕」不再算命中。
+ *        false = 旧口径（并集判断，整个技能的 tag 合起来算）。
  *   scope: {d:技能类型, e:技能效果, m:技能特性, g:tags字段}
  *   includeExcluded: 是否把「废弃/自定义/公式残条」条目也纳入检索（默认 false，即排除）
  *   cast: {min, max} 施法前摇闭区间（秒，null=该侧不限）——与 tag 条件**同时生效**，
@@ -358,7 +364,7 @@
     };
   }
 
-  /** 按匹配范围收集某技能的全部 tag id */
+  /** 按匹配范围收集某技能的全部 tag id（并集 —— 仅用于旧口径 / 纯反选 / tag 计数） */
   function tagSet(a, scope) {
     scope = normalizeScope(scope);
     var s = new Set();
@@ -367,6 +373,83 @@
     if (scope.m) (a.m || []).forEach(function (x) { s.add(x); });
     if (scope.e) (a.e || []).forEach(function (row) { (row.t || []).forEach(function (x) { s.add(x); }); });
     return s;
+  }
+
+  /* ---------- 判定单元（「同一效果内」匹配的基础）----------
+   * 一个技能的 tag 分放在几处，性质不同：
+   *   技能类型 d / 技能特性 m —— **技能级属性**（主动/被动、会被破坏…），对每个效果都成立
+   *   tags 字段 g            —— 一份汇总，混进效果里会把不同效果的 tag 串起来 → 自成一体
+   *   技能效果 e 的每一行     —— 各自独立，这才是「一个效果」
+   * 所以判定单元 = 每个效果行（并入技能级属性 d∪m）+ tags 字段 + 技能级本身(d∪m)。
+   * 条件必须在**同一个单元格内**成立才算命中。 */
+  function unitsOf(a, scope) {
+    scope = normalizeScope(scope);
+    var pool = new Set(), hasD = false, hasM = false, i;
+    if (scope.d) {
+      var d = a.d || [];
+      for (i = 0; i < d.length; i++) pool.add(d[i]);
+      hasD = d.length > 0;
+    }
+    if (scope.m) {
+      var m = a.m || [];
+      for (i = 0; i < m.length; i++) pool.add(m[i]);
+      hasM = m.length > 0;
+    }
+    var g = null;
+    if (scope.g && (a.g || []).length) g = new Set(a.g);
+    var rows = [];
+    if (scope.e) {
+      (a.e || []).forEach(function (row, k) {
+        var t = (row && row.t) || [];
+        if (t.length) rows.push({ i: k, n: (row && row.n) || '', ids: t });
+      });
+    }
+    return { pool: pool, hasD: hasD, hasM: hasM, g: g, rows: rows };
+  }
+
+  /** 候选单元（带显示名，顺序 = 展示优先级）：效果行（已并入技能级属性）→ tags 字段 → 技能级本身 */
+  function candidatesOf(a, scope) {
+    var u = unitsOf(a, scope);
+    var out = [];
+    u.rows.forEach(function (r) {
+      var set = new Set(u.pool);
+      for (var i = 0; i < r.ids.length; i++) set.add(r.ids[i]);
+      out.push({ kind: 'e', row: r.i, label: '效果' + (r.i + 1) + (r.n ? '「' + r.n + '」' : ''), set: set });
+    });
+    if (u.g) out.push({ kind: 'g', label: 'tags 字段', set: u.g });
+    if (u.pool.size) {
+      var lb = [];
+      if (u.hasD) lb.push('技能类型');
+      if (u.hasM) lb.push('技能特性');
+      out.push({ kind: 'p', label: lb.join(' + '), set: u.pool });
+    }
+    return out;
+  }
+
+  var hasAny = function (set, ids) {
+    for (var i = 0; i < ids.length; i++) { if (set.has(ids[i])) return true; }
+    return false;
+  };
+
+  /** 单个单元是否满足条件：且全部、或至少一项、反选一个都不许有；notIds 传 null = 忽略反选 */
+  function matchCand(set, andIds, orIds, notIds) {
+    var i;
+    for (i = 0; i < andIds.length; i++) {
+      if (andIds[i] && andIds[i].length && !hasAny(set, andIds[i])) return false;
+    }
+    if (orIds.length) {
+      var ok = false;
+      for (i = 0; i < orIds.length; i++) {
+        if (orIds[i] && orIds[i].length && hasAny(set, orIds[i])) { ok = true; break; }
+      }
+      if (!ok) return false;
+    }
+    if (notIds && notIds.length) {
+      for (i = 0; i < notIds.length; i++) {
+        if (notIds[i] && notIds[i].length && hasAny(set, notIds[i])) return false;
+      }
+    }
+    return true;
   }
 
   /** 某组 tag ids 在该技能中的命中位置（人类可读）；命中技能特性时附带其内容 */
@@ -388,6 +471,37 @@
         }
       });
     }
+    return out;
+  }
+
+  /** 某组 tag 在**命中单元**里的位置；cands 缺省/含 any = 旧口径（全技能所有位置） */
+  function locationsIn(a, ids, scope, index, cands) {
+    if (!cands || !cands.length) return locations(a, ids, scope, index);
+    scope = normalizeScope(scope);
+    var want = new Set(ids);
+    var hit = function (list) { return (list || []).some(function (x) { return want.has(x); }); };
+    var any = false, useD = false, useM = false, useG = false, rows = [];
+    cands.forEach(function (c) {
+      if (c.kind === 'any') any = true;
+      else if (c.kind === 'e') { useD = true; useM = true; rows.push(c.row); }
+      else if (c.kind === 'g') useG = true;
+      else if (c.kind === 'p') { useD = true; useM = true; }
+    });
+    if (any) return locations(a, ids, scope, index);
+    var out = [], seen = {};
+    if (useD && scope.d && hit(a.d)) out.push({ where: '技能类型', kind: 'd' });
+    if (useM && scope.m && hit(a.m)) {
+      var fs = index ? featsOf(index, a).filter(function (f) { return want.has(f.id); }) : [];
+      out.push({ where: '技能特性', kind: 'm', feats: fs });
+    }
+    if (useG && scope.g && hit(a.g)) out.push({ where: 'tags字段', kind: 'g' });
+    rows.forEach(function (i) {
+      if (seen[i]) return;
+      seen[i] = 1;
+      var row = (a.e || [])[i];
+      if (!row || !hit(row.t)) return;
+      out.push({ where: '效果' + (i + 1) + (row.n ? '「' + row.n + '」' : ''), kind: 'e', row: i + 1 });
+    });
     return out;
   }
 
@@ -501,7 +615,6 @@
       list.forEach(function (r) { if (r && !r.ids) unknown.push(r.input); });
     });
 
-    var hasId = function (set, ids) { return ids.some(function (id) { return set.has(id); }); };
     var hits = [];
     var showExcluded = !!query.includeExcluded;
     var skipped = 0;
@@ -525,27 +638,33 @@
     var heroSet = new Set(heroIds);
     var heroOut = 0;
     var notOut = 0;          // 被「反选」条件排除的技能条数（供界面说明「剩下」的算式）
+    var unitOut = 0;         // 条件分散在不同效果/位置 → 未命中（同效果匹配才统计）
     var afterTag = 0;        // 通过全部 tag 条件（含反选）、进入前摇判定的条数
+    // 匹配粒度：默认「同一单元内」（同效果匹配）；false = 旧口径（整技能并集）
+    var matchUnit = query.matchUnit !== false;
+    // 只有反选（没有且/或）时没有可锚定的单元 → 按整个技能判定
+    var pureNot = !andIds.length && !orIds.length;
 
     index.abilities.forEach(function (a) {
       var ex = excludeKind(a);
       if (ex && !showExcluded) { skipped++; return; }
       if (srcOn && !hasSource(a, srcSet)) { srcOut++; return; }
       if (heroOn && !hasHero(a, heroSet)) { heroOut++; return; }
-      var set = tagSet(a, scope);
-      var i;
-      for (i = 0; i < andIds.length; i++) {
-        if (andIds[i] && !hasId(set, andIds[i])) return;
+
+      var cands = (matchUnit && !pureNot)
+        ? candidatesOf(a, scope)
+        : [{ kind: 'any', label: '', set: tagSet(a, scope) }];
+      var matched = [], passedNoNot = false, ci;
+      for (ci = 0; ci < cands.length; ci++) {
+        if (!matchCand(cands[ci].set, andIds, orIds, null)) continue;
+        passedNoNot = true;
+        if (matchCand(cands[ci].set, andIds, orIds, notIds)) matched.push(cands[ci]);
       }
-      if (orIds.length) {
-        var okOr = false;
-        for (i = 0; i < orIds.length; i++) {
-          if (orIds[i] && hasId(set, orIds[i])) { okOr = true; break; }
-        }
-        if (!okOr) return;
-      }
-      for (i = 0; i < notIds.length; i++) {
-        if (notIds[i] && hasId(set, notIds[i])) { notOut++; return; }
+      if (!matched.length) {
+        if (passedNoNot) { notOut++; return; }                       // 只因反选被剔除
+        // 条件本身能被满足，只是分散在不同单元 → 记「不同效果」未命中
+        if (matchUnit && !pureNot && matchCand(tagSet(a, scope), andIds, orIds, notIds)) unitOut++;
+        return;
       }
       // 前摇区间（在 tag 条件之后应用，便于统计「因前摇被排除」的数量）
       afterTag++;
@@ -553,12 +672,20 @@
         if (!castPoints(a).length) { castMissing++; return; }
         if (!castInRange(a, castMin, castMax)) { castOut++; return; }
       }
+      var inMatched = function (ids) {
+        return matched.some(function (c) { return hasAny(c.set, ids); });
+      };
       var detail = [];
-      rAnd.forEach(function (r, k) {
-        if (r && r.ids) detail.push({ group: 'and', name: r.input, names: r.names, ids: r.ids, loc: locations(a, r.ids, scope, index) });
+      rAnd.forEach(function (r) {
+        if (r && r.ids) detail.push({ group: 'and', name: r.input, names: r.names, ids: r.ids, loc: locationsIn(a, r.ids, scope, index, matched) });
       });
-      rOr.forEach(function (r, k) {
-        if (r && r.ids && hasId(set, r.ids)) detail.push({ group: 'or', name: r.input, names: r.names, ids: r.ids, loc: locations(a, r.ids, scope, index) });
+      rOr.forEach(function (r) {
+        if (r && r.ids && inMatched(r.ids)) detail.push({ group: 'or', name: r.input, names: r.names, ids: r.ids, loc: locationsIn(a, r.ids, scope, index, matched) });
+      });
+      // 命中单元（同效果匹配时用于展示「这些 tag 落在哪一处」）
+      var unitLabels = [];
+      matched.forEach(function (c) {
+        if (c.label && unitLabels.indexOf(c.label) < 0) unitLabels.push(c.label);
       });
       // 被任一条件命中的技能特性（带内容），供详细展示
       var hitIds = [];
@@ -569,12 +696,12 @@
         return hitIds.indexOf(f.id) >= 0 && f.text;
       });
       hits.push({
-        id: a.i, name: a.n, en: a.en, heroes: heroesOf(index, a), tagCount: set.size, detail: detail, feats: feats,
+        id: a.i, name: a.n, en: a.en, heroes: heroesOf(index, a), tagCount: tagSet(a, scope).size,
+        detail: detail, feats: feats, unitLabels: unitLabels,
         ability: a, upgrades: upgrades(a), excluded: ex || null,
         cast: String(a.cp == null ? '' : a.cp), castVals: castPoints(a)
       });
     });
-
     hits.sort(function (x, y) { return y.id - x.id; });
     return {
       hits: hits,
@@ -589,7 +716,8 @@
         effective: index.abilities.length - (index.excludedTotal || 0),
         includeExcluded: showExcluded,
         cast: { on: castOn, min: castMin, max: castMax, missing: castMissing, out: castOut },
-        not: { on: notIds.length > 0, out: notOut, afterTag: afterTag, names: rNot.map(function (r) { return r && r.input || ''; }) },
+        unit: { on: matchUnit && !pureNot, matchUnit: matchUnit, pureNot: pureNot, out: unitOut },
+        not: { on: notIds.length > 0, out: notOut, afterTag: afterTag, unit: matchUnit && !pureNot, names: rNot.map(function (r) { return r && r.input || ''; }) },
         hero: heroStats(index, heroOn, heroIds, heroOut),
         src: sourceStats(index, srcKeys, srcOut)
       }
@@ -624,6 +752,10 @@
     noteStats: noteStats,
     tagSet: tagSet,
     locations: locations,
+    locationsIn: locationsIn,
+    unitsOf: unitsOf,
+    candidatesOf: candidatesOf,
+    matchCand: matchCand,
     describe: describe,
     resolveName: resolveName,
     upgrades: upgrades,

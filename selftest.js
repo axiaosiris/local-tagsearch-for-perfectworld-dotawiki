@@ -218,3 +218,51 @@ var fBoth = core.search(fake, { and: [], or: [], not: [], sources: ['hero', 'cre
 console.log('  只 creep ' + fItem.hits.length + ' ｜只 hero ' + fHero.hits.length + ' ｜两者 ' + fBoth.hits.length +
   '（合计应 = 有效 ' + (fake.abilities.length - fake.excludedTotal) + '）');
 console.log('  只 creep 的 stats.src = ' + JSON.stringify(fItem.stats.src));
+
+// ================= 同一效果内匹配（matchUnit，默认开启） =================
+console.log('\n[同一效果内匹配]');
+var SCOPEFULL = { d: 1, e: 1, m: 1, g: 1 };
+var pairNames = ['弱驱散', '眩晕'];
+var rUnion = core.search(idx, { and: pairNames, or: [], not: [], scope: SCOPEFULL, matchUnit: false });
+var rUnit = core.search(idx, { and: pairNames, or: [], not: [], scope: SCOPEFULL });
+console.log('  且:' + pairNames.join('+') + ' → 整技能合并 ' + rUnion.hits.length + ' 条；同一效果内 ' +
+  rUnit.hits.length + ' 条（另有 ' + rUnit.stats.unit.out + ' 条因条件分散在不同效果/位置未命中）');
+console.log('  差值自洽：' + (rUnion.hits.length === rUnit.hits.length + rUnit.stats.unit.out ? '✓' : '✗') +
+  '（' + rUnit.hits.length + ' + ' + rUnit.stats.unit.out + ' = ' + rUnion.hits.length + '）');
+
+// 不变量：每条命中都能在技能里找到**同一个单元**同时含这两个 tag
+var wantIds = pairNames.map(function (n) { return idx.name2ids.get(n) || []; });
+var bad = rUnit.hits.filter(function (h) {
+  return !core.candidatesOf(h.ability, SCOPEFULL).some(function (c) {
+    return wantIds.every(function (ids) { return ids.some(function (x) { return c.set.has(x); }); });
+  });
+});
+console.log('  不变量「同一单元内共现」：' + (bad.length ? '✗ ' + bad.length + ' 条不符合' : '✓ 全部满足') +
+  (bad.length ? ' → ' + bad.slice(0, 3).map(function (h) { return h.name; }).join('、') : ''));
+rUnit.hits.slice(0, 5).forEach(function (h) {
+  console.log('    · ' + h.id + ' ' + h.name + '  命中单元：' + (h.unitLabels || []).join(' / '));
+});
+
+// 单条件时两种口径必须完全一致（只有多项条件才可能出现「分散」）
+['弱驱散', '眩晕', '防御塔', '会被破坏'].forEach(function (n) {
+  var u = core.search(idx, { and: [n], scope: SCOPEFULL, matchUnit: false }).hits.length;
+  var s = core.search(idx, { and: [n], scope: SCOPEFULL }).hits.length;
+  console.log('  单项「' + n + '」：整技能 ' + u + ' ／ 同一效果 ' + s + '　' + (u === s ? '✓ 一致' : '✗ 不一致'));
+});
+
+// 或：也在同一单元内判断
+var rOrUnit = core.search(idx, { and: ['弱驱散'], or: ['眩晕', '沉默'], scope: SCOPEFULL });
+var rOrUnion = core.search(idx, { and: ['弱驱散'], or: ['眩晕', '沉默'], scope: SCOPEFULL, matchUnit: false });
+console.log('  且:弱驱散 或:眩晕|沉默 → 整技能 ' + rOrUnion.hits.length + ' 条；同一效果内 ' + rOrUnit.hits.length +
+  ' 条（分散 ' + rOrUnit.stats.unit.out + '）');
+
+// 反选：命中单元里不得出现被反选的 tag（只填反选时退化为「整技能不得包含」）
+var nUnit = core.search(idx, { and: ['眩晕'], not: ['减速'], scope: SCOPEFULL });
+var nUnion = core.search(idx, { and: ['眩晕'], not: ['减速'], scope: SCOPEFULL, matchUnit: false });
+console.log('  且:眩晕 非:减速 → 同一效果内 ' + nUnit.hits.length + ' 条（被反选剔除 ' + nUnit.stats.not.out +
+  '）；整技能 ' + nUnion.hits.length + ' 条（剔除 ' + nUnion.stats.not.out + '）');
+var pcUnit = core.search(idx, { not: ['眩晕'], scope: SCOPEFULL });
+var pcUnion = core.search(idx, { not: ['眩晕'], scope: SCOPEFULL, matchUnit: false });
+console.log('  只填反选 非:眩晕 → ' + pcUnit.hits.length + ' ／ ' + pcUnion.hits.length +
+  '　' + (pcUnit.hits.length === pcUnion.hits.length ? '✓ 两种口径一致（无锚点时按整技能判定）' : '✗ 不一致'));
+

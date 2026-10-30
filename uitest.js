@@ -514,7 +514,81 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
       doc.getElementById('nHit').textContent);
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
 
-    // ================= 技能筛选（按数据来源；目前只有「现版本英雄技能」） =================
+    // ================= 同一效果内匹配（matchUnit，默认开启） =================
+    window.__tagsearch.applyDb({
+      fetchedAt: '2026-10-30T00:00:00.000Z',
+      tags: [{ id: 601, name: '测试弱驱散', c1: '机制', c2: '包含效果' },
+             { id: 602, name: '测试眩晕', c1: '机制', c2: '包含效果' }],
+      notePool: [],
+      abilities: [
+        { i: 9501, n: '同效果技能', en: 'same_row', d: [], g: [], m: [], e: [{ n: '效果甲', t: [601, 602] }] },
+        { i: 9502, n: '跨效果技能', en: 'cross_row', d: [], g: [], m: [],
+          e: [{ n: '效果甲', t: [601] }, { n: '效果乙', t: [602] }] }
+      ]
+    }, '合成测试数据（同一效果）');
+    mTag.dispatchEvent(new window.Event('click', { bubbles: true }));
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    const mu = doc.getElementById('matchUnit');
+    ok(!!mu, '左栏存在「同一效果内匹配」开关');
+    ok(mu.checked === true, '「同一效果内匹配」默认勾选');
+
+    const andRows = () => Array.prototype.slice.call(doc.querySelectorAll('.grp[data-k="and"] .rows input'));
+    const setAnd = (vals) => {
+      doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+      vals.forEach((v, k) => {
+        if (k > 0) doc.querySelector('[data-add="and"]').dispatchEvent(new window.Event('click', { bubbles: true }));
+        const inp = andRows()[k];
+        inp.value = v;
+        inp.dispatchEvent(new window.Event('input', { bubbles: true }));
+      });
+      doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    };
+
+    setAnd(['测试弱驱散', '测试眩晕']);
+    ok(+doc.getElementById('nHit').textContent === 1, '且:A+B 只命中「同一效果里同时含 A、B」的技能',
+      doc.getElementById('nHit').textContent);
+    ok(/同效果技能/.test(doc.getElementById('tblbox').textContent) &&
+       !/跨效果技能/.test(doc.getElementById('tblbox').textContent),
+      '「A 在效果1、B 在效果2」不再算命中');
+    ok(/同一效果内匹配/.test(doc.getElementById('tblbox').textContent) &&
+       /分散/.test(doc.getElementById('tblbox').textContent), '结果区说明有多少条因条件分散未命中');
+    const uChips = doc.querySelectorAll('#tblbox .chip.unit');
+    ok(uChips.length === 1 && /效果1/.test(uChips[0].textContent), '命中行标注命中单元（效果1）',
+      uChips.length ? uChips[0].textContent.trim() : '(无)');
+    ok(/同一效果内/.test(doc.getElementById('expr').textContent), '「当前条件」标明匹配粒度',
+      doc.getElementById('expr').textContent.replace(/\s+/g, ' ').trim());
+
+    mu.checked = false;
+    mu.dispatchEvent(new window.Event('change', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 2, '取消勾选 → 回到旧口径（整技能合并，2 条）',
+      doc.getElementById('nHit').textContent);
+    ok(doc.querySelectorAll('#tblbox .chip.unit').length === 0, '旧口径不显示命中单元');
+    ok(/整技能合并/.test(doc.getElementById('expr').textContent), '表达式切换为「整技能合并」',
+      doc.getElementById('expr').textContent.replace(/\s+/g, ' ').trim());
+
+    mu.checked = true;
+    mu.dispatchEvent(new window.Event('change', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 1, '重新勾选 → 恢复同一效果内（1 条）',
+      doc.getElementById('nHit').textContent);
+
+    // 反选也在同一效果内判断：同效果技能的「效果甲」里就有 B → 被剔除；跨效果技能仍命中
+    setAnd(['测试弱驱散']);
+    doc.querySelector('.grp[data-k="not"] [data-add]').dispatchEvent(new window.Event('click', { bubbles: true }));
+    const notInp = doc.querySelector('.grp[data-k="not"] .rows input');
+    notInp.value = '测试眩晕';
+    notInp.dispatchEvent(new window.Event('input', { bubbles: true }));
+    doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 1 &&
+       /跨效果技能/.test(doc.getElementById('tblbox').textContent),
+      '反选按命中单元判断：含 B 的那个效果被剔除，另一个效果仍可命中',
+      doc.getElementById('nHit').textContent);
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+    doc.querySelector('.grp[data-k="not"] .rows .del') &&
+      doc.querySelectorAll('.grp[data-k="not"] .rows .del').forEach((b) => b.dispatchEvent(new window.Event('click', { bubbles: true })));
+    mu.checked = true;
+
+    // ================= 技能筛选（按数据来源；英雄技能 + 物品技能） =================
     const srcDb = {
       fetchedAt: '2026-10-26T00:00:00.000Z',
       tags: [{ id: 488, name: '治疗', c1: '机制', c2: '包含效果' }],
@@ -538,7 +612,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(!!doc.getElementById('paneSrc'), '左栏存在「技能筛选」卡片');
     ok(!doc.getElementById('paneHero') && !doc.getElementById('heroGrid'),
       '原「英雄筛选」卡片与英雄网格已移除');
-    ok(sChips().length === 1, '只列出已接入的来源（1 类）', sChips().length);
+    ok(sChips().length === 2, '只列出已接入的来源（2 类：英雄技能 + 物品技能）', sChips().length);
     ok(/现版本英雄技能/.test(sChips()[0].textContent), '来源选项为「现版本英雄技能」',
       sChips()[0].textContent.trim());
     ok(sChips()[0].querySelector('input').checked, '「现版本英雄技能」默认勾选');
@@ -552,10 +626,13 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
     ok(+doc.getElementById('nHit').textContent === 2, '默认来源下命中 2 条', doc.getElementById('nHit').textContent);
 
-    // 全部取消勾选 → 拦住、不出结果
+    // 全部取消勾选 → 拦住、不出结果（已接入的两类都要取消）
     let cbSrc = srcCb(/现版本英雄技能/);
     cbSrc.checked = false;
     cbSrc.dispatchEvent(new window.Event('change', { bubbles: true }));
+    let cbItem = srcCb(/物品技能/);
+    cbItem.checked = false;
+    cbItem.dispatchEvent(new window.Event('change', { bubbles: true }));
     ok(/至少勾选一类「技能来源」/.test(doc.getElementById('tblbox').textContent),
       '全不勾来源时提示至少勾选一类');
     ok(/未选来源/.test(doc.getElementById('srcSum').textContent), '摘要显示「未选来源」',
@@ -567,7 +644,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     cbSrc.dispatchEvent(new window.Event('change', { bubbles: true }));
     ok(+doc.getElementById('nHit').textContent === 2, '重新勾上后恢复结果', doc.getElementById('nHit').textContent);
 
-    // 数据里出现第二类来源（模拟接入物品技能）→ 自动多出勾选项，且默认不勾
+    // 数据里出现物品技能条目 → 来源已有对应勾选项，默认勾选
     window.__tagsearch.applyDb({
       fetchedAt: srcDb.fetchedAt, tags: srcDb.tags, notePool: srcDb.notePool, heroes: srcDb.heroes,
       abilities: srcDb.abilities.concat([
@@ -576,7 +653,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     }, '含物品技能');
     ok(sChips().length === 2, '数据里出现新来源时自动多出勾选项', sChips().length);
     const itemCb = srcCb(/物品技能/);
-    ok(!!itemCb && !itemCb.checked, '尚未接入完成的来源默认不勾选');
+    ok(!!itemCb && !itemCb.checked, '手动取消过的来源，换数据后仍保持未勾选（选择状态沿用）');
     ok(/已选 1 \/ 2 类/.test(doc.getElementById('srcSum').textContent), '摘要反映「已选 1 / 2 类」',
       doc.getElementById('srcSum').textContent);
 
