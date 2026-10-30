@@ -219,48 +219,72 @@ console.log('  只 creep ' + fItem.hits.length + ' ｜只 hero ' + fHero.hits.le
   '（合计应 = 有效 ' + (fake.abilities.length - fake.excludedTotal) + '）');
 console.log('  只 creep 的 stats.src = ' + JSON.stringify(fItem.stats.src));
 
-// ================= 同一效果内匹配（matchUnit，默认开启） =================
-console.log('\n[同一效果内匹配]');
+// ================= 匹配粒度：效果类 tag 须落在同一效果条目 =================
+console.log('\n[匹配粒度：效果类 tag 同一效果条目]');
 var SCOPEFULL = { d: 1, e: 1, m: 1, g: 1 };
+// 分类核对：效果类 = 机制-包含效果 及同级效果组；其余（类型/特性类）为技能级
+['弱驱散', '眩晕', '治疗', '点目标', '会被破坏', '防御塔'].forEach(function (n) {
+  var r = core.resolveName(idx, n, false);
+  var ids = (r && r.ids) || [];
+  console.log('  「' + n + '」(' + ((r && r.names) || []).join('/') + ') → ' +
+    (core.isEffectCond(idx, ids) ? '效果类（须同一效果条目）' : '技能级（跨效果/类型/特性）'));
+});
+
 var pairNames = ['弱驱散', '眩晕'];
 var rUnion = core.search(idx, { and: pairNames, or: [], not: [], scope: SCOPEFULL, matchUnit: false });
 var rUnit = core.search(idx, { and: pairNames, or: [], not: [], scope: SCOPEFULL });
-console.log('  且:' + pairNames.join('+') + ' → 整技能合并 ' + rUnion.hits.length + ' 条；同一效果内 ' +
-  rUnit.hits.length + ' 条（另有 ' + rUnit.stats.unit.out + ' 条因条件分散在不同效果/位置未命中）');
+console.log('  且:' + pairNames.join('+') + ' → 整技能合并 ' + rUnion.hits.length + ' 条；同一效果条目 ' +
+  rUnit.hits.length + ' 条（另有 ' + rUnit.stats.unit.out + ' 条因效果类 tag 分散在不同效果条目未命中）');
 console.log('  差值自洽：' + (rUnion.hits.length === rUnit.hits.length + rUnit.stats.unit.out ? '✓' : '✗') +
   '（' + rUnit.hits.length + ' + ' + rUnit.stats.unit.out + ' = ' + rUnion.hits.length + '）');
 
-// 不变量：每条命中都能在技能里找到**同一个单元**同时含这两个 tag
+// 不变量：每条命中都能找到**同一个效果条目**同时含这两个效果类 tag
 var wantIds = pairNames.map(function (n) { return idx.name2ids.get(n) || []; });
 var bad = rUnit.hits.filter(function (h) {
-  return !core.candidatesOf(h.ability, SCOPEFULL).some(function (c) {
+  return !core.effectRowsOf(h.ability, SCOPEFULL, idx).some(function (c) {
     return wantIds.every(function (ids) { return ids.some(function (x) { return c.set.has(x); }); });
   });
 });
-console.log('  不变量「同一单元内共现」：' + (bad.length ? '✗ ' + bad.length + ' 条不符合' : '✓ 全部满足') +
+console.log('  不变量「同一效果条目内共现」：' + (bad.length ? '✗ ' + bad.length + ' 条不符合' : '✓ 全部满足') +
   (bad.length ? ' → ' + bad.slice(0, 3).map(function (h) { return h.name; }).join('、') : ''));
 rUnit.hits.slice(0, 5).forEach(function (h) {
-  console.log('    · ' + h.id + ' ' + h.name + '  命中单元：' + (h.unitLabels || []).join(' / '));
+  console.log('    · ' + h.id + ' ' + h.name + '  命中效果：' + (h.unitLabels || []).join(' / '));
 });
 
-// 单条件时两种口径必须完全一致（只有多项条件才可能出现「分散」）
+// 效果类 + 技能级：类型/特性类 tag 可以跨效果 —— 不应比整技能口径少
+var mixNames = ['点目标', '眩晕'];
+var mUnit = core.search(idx, { and: mixNames, scope: SCOPEFULL });
+var mUnion = core.search(idx, { and: mixNames, scope: SCOPEFULL, matchUnit: false });
+console.log('  且:点目标+眩晕（技能级 + 效果类）→ ' + mUnit.hits.length + ' 条；整技能 ' + mUnion.hits.length +
+  ' 条　' + (mUnit.hits.length === mUnion.hits.length ? '✓ 技能级 tag 未受同条目限制' : '✗ 被误限'));
+var badMix = mUnit.hits.filter(function (h) {
+  return !h.detail.some(function (d) { return d.name === '点目标' && !d.unit; });
+});
+console.log('  其中「点目标」按技能级判定：' + (badMix.length ? '✗ ' + badMix.length + ' 条' : '✓ 全部'));
+
+// 单条件时两种口径必须完全一致（只有多项效果类条件才可能出现「分散」）
 ['弱驱散', '眩晕', '防御塔', '会被破坏'].forEach(function (n) {
   var u = core.search(idx, { and: [n], scope: SCOPEFULL, matchUnit: false }).hits.length;
   var s = core.search(idx, { and: [n], scope: SCOPEFULL }).hits.length;
-  console.log('  单项「' + n + '」：整技能 ' + u + ' ／ 同一效果 ' + s + '　' + (u === s ? '✓ 一致' : '✗ 不一致'));
+  console.log('  单项「' + n + '」：整技能 ' + u + ' ／ 同一效果条目 ' + s + '　' + (u === s ? '✓ 一致' : '✗ 不一致'));
 });
 
-// 或：也在同一单元内判断
+// 或：效果类 tag 的「或」也要落在同一效果条目
 var rOrUnit = core.search(idx, { and: ['弱驱散'], or: ['眩晕', '沉默'], scope: SCOPEFULL });
 var rOrUnion = core.search(idx, { and: ['弱驱散'], or: ['眩晕', '沉默'], scope: SCOPEFULL, matchUnit: false });
-console.log('  且:弱驱散 或:眩晕|沉默 → 整技能 ' + rOrUnion.hits.length + ' 条；同一效果内 ' + rOrUnit.hits.length +
+console.log('  且:弱驱散 或:眩晕|沉默 → 整技能 ' + rOrUnion.hits.length + ' 条；同一效果条目 ' + rOrUnit.hits.length +
   ' 条（分散 ' + rOrUnit.stats.unit.out + '）');
 
-// 反选：命中单元里不得出现被反选的 tag（只填反选时退化为「整技能不得包含」）
-var nUnit = core.search(idx, { and: ['眩晕'], not: ['减速'], scope: SCOPEFULL });
-var nUnion = core.search(idx, { and: ['眩晕'], not: ['减速'], scope: SCOPEFULL, matchUnit: false });
-console.log('  且:眩晕 非:减速 → 同一效果内 ' + nUnit.hits.length + ' 条（被反选剔除 ' + nUnit.stats.not.out +
+// 反选：效果类 tag 只在命中的那个效果条目里排除；技能级 tag 出现即整条剔除
+var nUnit = core.search(idx, { and: ['眩晕'], not: ['治疗'], scope: SCOPEFULL });
+var nUnion = core.search(idx, { and: ['眩晕'], not: ['治疗'], scope: SCOPEFULL, matchUnit: false });
+console.log('  且:眩晕 非:治疗（效果类反选）→ 同一效果条目 ' + nUnit.hits.length + ' 条（剔除 ' + nUnit.stats.not.out +
   '）；整技能 ' + nUnion.hits.length + ' 条（剔除 ' + nUnion.stats.not.out + '）');
+var nGen = core.search(idx, { and: ['眩晕'], not: ['点目标'], scope: SCOPEFULL });
+var nGenUnion = core.search(idx, { and: ['眩晕'], not: ['点目标'], scope: SCOPEFULL, matchUnit: false });
+console.log('  且:眩晕 非:点目标（技能级反选）→ ' + nGen.hits.length + ' ／ 整技能 ' + nGenUnion.hits.length +
+  '　' + (nGen.hits.length === nGenUnion.hits.length ? '✓ 一致（技能级反选整条剔除）' : '✗ 不一致'));
+console.log('  反选分类：效果类 ' + JSON.stringify(nUnit.stats.not.effNames) + ' ／ 技能级 ' + JSON.stringify(nGen.stats.not.genNames));
 var pcUnit = core.search(idx, { not: ['眩晕'], scope: SCOPEFULL });
 var pcUnion = core.search(idx, { not: ['眩晕'], scope: SCOPEFULL, matchUnit: false });
 console.log('  只填反选 非:眩晕 → ' + pcUnit.hits.length + ' ／ ' + pcUnion.hits.length +

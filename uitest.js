@@ -518,11 +518,12 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     window.__tagsearch.applyDb({
       fetchedAt: '2026-10-30T00:00:00.000Z',
       tags: [{ id: 601, name: '测试弱驱散', c1: '机制', c2: '包含效果' },
-             { id: 602, name: '测试眩晕', c1: '机制', c2: '包含效果' }],
+             { id: 602, name: '测试眩晕', c1: '机制', c2: '包含效果' },
+             { id: 603, name: '测试点目标', c1: '机制', c2: '施法类型' }],
       notePool: [],
       abilities: [
-        { i: 9501, n: '同效果技能', en: 'same_row', d: [], g: [], m: [], e: [{ n: '效果甲', t: [601, 602] }] },
-        { i: 9502, n: '跨效果技能', en: 'cross_row', d: [], g: [], m: [],
+        { i: 9501, n: '同效果技能', en: 'same_row', d: [603], g: [], m: [], e: [{ n: '效果甲', t: [601, 602] }] },
+        { i: 9502, n: '跨效果技能', en: 'cross_row', d: [603], g: [], m: [],
           e: [{ n: '效果甲', t: [601] }, { n: '效果乙', t: [602] }] }
       ]
     }, '合成测试数据（同一效果）');
@@ -551,12 +552,12 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(/同效果技能/.test(doc.getElementById('tblbox').textContent) &&
        !/跨效果技能/.test(doc.getElementById('tblbox').textContent),
       '「A 在效果1、B 在效果2」不再算命中');
-    ok(/同一效果内匹配/.test(doc.getElementById('tblbox').textContent) &&
+    ok(/效果类 tag 同一效果条目/.test(doc.getElementById('tblbox').textContent) &&
        /分散/.test(doc.getElementById('tblbox').textContent), '结果区说明有多少条因条件分散未命中');
     const uChips = doc.querySelectorAll('#tblbox .chip.unit');
-    ok(uChips.length === 1 && /效果1/.test(uChips[0].textContent), '命中行标注命中单元（效果1）',
+    ok(uChips.length === 1 && /效果1/.test(uChips[0].textContent), '命中行标注命中效果条目（效果1）',
       uChips.length ? uChips[0].textContent.trim() : '(无)');
-    ok(/同一效果内/.test(doc.getElementById('expr').textContent), '「当前条件」标明匹配粒度',
+    ok(/效果类同一条目/.test(doc.getElementById('expr').textContent), '「当前条件」标明匹配粒度',
       doc.getElementById('expr').textContent.replace(/\s+/g, ' ').trim());
 
     mu.checked = false;
@@ -587,6 +588,15 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     doc.querySelector('.grp[data-k="not"] .rows .del') &&
       doc.querySelectorAll('.grp[data-k="not"] .rows .del').forEach((b) => b.dispatchEvent(new window.Event('click', { bubbles: true })));
     mu.checked = true;
+
+    // 技能级 tag（类型 / 特性类）可以跨效果：点目标 + 眩晕 不再要求落在同一条效果
+    setAnd(['测试点目标', '测试眩晕']);
+    ok(+doc.getElementById('nHit').textContent === 2,
+      '技能级 tag + 效果类 tag：技能级可跨效果，两条技能都命中', doc.getElementById('nHit').textContent);
+    ok(/跨效果技能/.test(doc.getElementById('tblbox').textContent),
+      '「点目标在技能类型、眩晕在效果2」也算命中（技能级 tag 不受同条目限制）');
+    ok(/技能类型/.test(doc.getElementById('tblbox').textContent),
+      '结果里标出技能级 tag 的命中位置（技能类型）');
 
     // ================= 技能筛选（按数据来源；英雄技能 + 物品技能） =================
     const srcDb = {

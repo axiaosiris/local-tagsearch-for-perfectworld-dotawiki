@@ -8,12 +8,14 @@
  *   and: [tagName…] 必须全部包含（且）
  *   or : [tagName…] 至少包含其一（或）——为空则不参与判断
  *   not: [tagName…] 全部不得包含（反选/排除）
- *   matchUnit: 匹配粒度（默认 true）——true = **同一单元内**成立才算命中：
- *        一个技能的 tag 分散在「技能类型 / tags 字段 / 每条技能特性 / 每个技能效果行」里，
- *        且/或/非 必须在**同一个单元**里同时成立，而不是把整个技能的 tag 合起来凑。
- *        例：且=[弱驱散, 眩晕] → 只命中「某个效果里同时有这两个 tag」的技能；
- *        「效果2有弱驱散、效果1有眩晕」不再算命中。
- *        false = 旧口径（并集判断，整个技能的 tag 合起来算）。
+ *   matchUnit: 匹配粒度（默认 true）——分两类 tag 判定：
+ *        ①「效果类」tag（tag 管理里 机制-包含效果 及其同级效果组：包含效果/状态效果/
+ *          驱散情况/减益免疫/叠加方式/伤害类型…）→ 必须**落在同一个效果条目里**；
+ *          例：且=[弱驱散, 眩晕] 只命中「某个效果里同时有这两个 tag」的技能，
+ *          「效果2有弱驱散、效果1有眩晕」不再算命中（或 / 反选同理）。
+ *        ②「技能级」tag（技能类型 / 技能特性的类别：点目标、主动、会被破坏…）→
+ *          可以跨效果、跨类型、跨特性，在整个技能里满足即可。
+ *        false = 旧口径（整技能的 tag 并集判断）。
  *   scope: {d:技能类型, e:技能效果, m:技能特性, g:tags字段}
  *   includeExcluded: 是否把「废弃/自定义/公式残条」条目也纳入检索（默认 false，即排除）
  *   cast: {min, max} 施法前摇闭区间（秒，null=该侧不限）——与 tag 条件**同时生效**，
@@ -375,55 +377,80 @@
     return s;
   }
 
-  /* ---------- 判定单元（「同一效果内」匹配的基础）----------
+  /* ---------- 匹配粒度：效果类 tag 必须落在「同一个效果条目」----------
    * 一个技能的 tag 分放在几处，性质不同：
-   *   技能类型 d / 技能特性 m —— **技能级属性**（主动/被动、会被破坏…），对每个效果都成立
-   *   tags 字段 g            —— 一份汇总，混进效果里会把不同效果的 tag 串起来 → 自成一体
-   *   技能效果 e 的每一行     —— 各自独立，这才是「一个效果」
-   * 所以判定单元 = 每个效果行（并入技能级属性 d∪m）+ tags 字段 + 技能级本身(d∪m)。
-   * 条件必须在**同一个单元格内**成立才算命中。 */
-  function unitsOf(a, scope) {
+   *   技能类型 d / 技能特性 m —— 技能级属性（点目标、主动、会被破坏…），整条技能成立
+   *   tags 字段 g            —— 汇总，混进效果里会把不同效果的 tag 串起来，不参与效果条目判定
+   *   技能效果 e 的每一行     —— 这才是「一个效果条目」
+   *
+   * 「效果类 tag」= 只描述某个效果本身的类别（见 EFFECT_C2，即 tag 管理里
+   *   「机制-包含效果」及其同级效果组下的词条：包含效果/状态效果/驱散情况/减益免疫/
+   *   叠加方式/伤害类型/伤害性质/状态抗性/减速抗性/无敌隐藏/伤害标记/初始伤害/判定时机/
+   *   生效从属/伤害间隔/状态来源/状态归属/升级来源）。
+   * 其余类别（施法类型/技能类别/冷却类型/魔法消耗/生命消耗/加成属性/目标/技能行为/
+   *   施放技能时/面对控制时/指向性技能施法时/攻击命中判定）属技能级 tag。
+   *
+   * 判定规则：
+   *   效果类 且/或/非 —— 必须在**同一个效果条目**里成立（不能「效果2 有 A、效果1 有 B」）
+   *   技能级 且/或/非 —— 整个技能（类型 ∪ 特性 ∪ tags 字段 ∪ 所有效果）里成立即可
+   * 同一条条件里若混了两类 tag（极少见）→ 按技能级处理（宽松）。
+   */
+  var EFFECT_C2 = {
+    '包含效果': 1, '状态效果': 1, '驱散情况': 1, '减益免疫': 1, '叠加方式': 1,
+    '伤害类型': 1, '伤害性质': 1, '状态抗性': 1, '减速抗性': 1, '无敌隐藏': 1,
+    '伤害标记': 1, '初始伤害': 1, '判定时机': 1, '生效从属': 1, '伤害间隔': 1,
+    '状态来源': 1, '状态归属': 1, '升级来源': 1
+  };
+
+  /** 该 tag 是否「效果类」（决定它要不要跟别的效果类 tag 挤在同一个效果条目里） */
+  function isEffectTag(index, id) {
+    var t = index && index.id2tag ? index.id2tag.get(id) : null;
+    return !!(t && EFFECT_C2[t.c2]);
+  }
+
+  /** 一条条件（已解析出 ids）是否按「同一效果条目」判定：全部 id 都是效果类才算 */
+  function isEffectCond(index, ids) {
+    if (!ids || !ids.length) return false;
+    for (var i = 0; i < ids.length; i++) { if (!isEffectTag(index, ids[i])) return false; }
+    return true;
+  }
+
+  /** 技能的效果条目（判定单元）：每个效果行的 tag 集合。
+   *  tags 字段里那些「任何行都没有」的效果类残留 tag 视为技能级补充，挂到每行；
+   *  技能一行效果都没有（天赋加成、纯被动条目等）→ 整条技能算一个单元。 */
+  function effectRowsOf(a, scope, index) {
     scope = normalizeScope(scope);
-    var pool = new Set(), hasD = false, hasM = false, i;
-    if (scope.d) {
-      var d = a.d || [];
-      for (i = 0; i < d.length; i++) pool.add(d[i]);
-      hasD = d.length > 0;
-    }
-    if (scope.m) {
-      var m = a.m || [];
-      for (i = 0; i < m.length; i++) pool.add(m[i]);
-      hasM = m.length > 0;
-    }
-    var g = null;
-    if (scope.g && (a.g || []).length) g = new Set(a.g);
-    var rows = [];
+    var rows = [], inRows = new Set();
     if (scope.e) {
       (a.e || []).forEach(function (row, k) {
         var t = (row && row.t) || [];
-        if (t.length) rows.push({ i: k, n: (row && row.n) || '', ids: t });
+        if (!t.length) return;
+        t.forEach(function (x) { inRows.add(x); });
+        rows.push({
+          i: k, n: (row && row.n) || '', ids: t.slice(),
+          label: '效果' + (k + 1) + ((row && row.n) ? '「' + row.n + '」' : '')
+        });
       });
     }
-    return { pool: pool, hasD: hasD, hasM: hasM, g: g, rows: rows };
-  }
-
-  /** 候选单元（带显示名，顺序 = 展示优先级）：效果行（已并入技能级属性）→ tags 字段 → 技能级本身 */
-  function candidatesOf(a, scope) {
-    var u = unitsOf(a, scope);
-    var out = [];
-    u.rows.forEach(function (r) {
-      var set = new Set(u.pool);
-      for (var i = 0; i < r.ids.length; i++) set.add(r.ids[i]);
-      out.push({ kind: 'e', row: r.i, label: '效果' + (r.i + 1) + (r.n ? '「' + r.n + '」' : ''), set: set });
-    });
-    if (u.g) out.push({ kind: 'g', label: 'tags 字段', set: u.g });
-    if (u.pool.size) {
-      var lb = [];
-      if (u.hasD) lb.push('技能类型');
-      if (u.hasM) lb.push('技能特性');
-      out.push({ kind: 'p', label: lb.join(' + '), set: u.pool });
+    var residual = [];
+    if (scope.g && index) {
+      (a.g || []).forEach(function (x) {
+        if (!inRows.has(x) && isEffectTag(index, x)) residual.push(x);
+      });
     }
-    return out;
+    rows.forEach(function (r) {
+      var s = new Set(r.ids);
+      residual.forEach(function (x) { s.add(x); });
+      r.set = s;
+    });
+    if (!rows.length) {
+      var s = new Set(residual);
+      if (scope.d) (a.d || []).forEach(function (x) { s.add(x); });
+      if (scope.m) (a.m || []).forEach(function (x) { s.add(x); });
+      if (scope.g) (a.g || []).forEach(function (x) { s.add(x); });
+      if (s.size) rows.push({ i: -1, n: '', ids: [], label: '整条技能', set: s });
+    }
+    return rows;
   }
 
   var hasAny = function (set, ids) {
@@ -474,34 +501,29 @@
     return out;
   }
 
-  /** 某组 tag 在**命中单元**里的位置；cands 缺省/含 any = 旧口径（全技能所有位置） */
-  function locationsIn(a, ids, scope, index, cands) {
-    if (!cands || !cands.length) return locations(a, ids, scope, index);
-    scope = normalizeScope(scope);
+  /** 某组 tag 在**命中的效果条目**里的位置；rows 为空或缺省 = 全技能所有位置 */
+  function locationsInRows(a, ids, scope, index, rows) {
+    if (!rows || !rows.length) return locations(a, ids, scope, index);
     var want = new Set(ids);
-    var hit = function (list) { return (list || []).some(function (x) { return want.has(x); }); };
-    var any = false, useD = false, useM = false, useG = false, rows = [];
-    cands.forEach(function (c) {
-      if (c.kind === 'any') any = true;
-      else if (c.kind === 'e') { useD = true; useM = true; rows.push(c.row); }
-      else if (c.kind === 'g') useG = true;
-      else if (c.kind === 'p') { useD = true; useM = true; }
-    });
-    if (any) return locations(a, ids, scope, index);
+    var inRow = false;
     var out = [], seen = {};
-    if (useD && scope.d && hit(a.d)) out.push({ where: '技能类型', kind: 'd' });
-    if (useM && scope.m && hit(a.m)) {
-      var fs = index ? featsOf(index, a).filter(function (f) { return want.has(f.id); }) : [];
-      out.push({ where: '技能特性', kind: 'm', feats: fs });
-    }
-    if (useG && scope.g && hit(a.g)) out.push({ where: 'tags字段', kind: 'g' });
-    rows.forEach(function (i) {
-      if (seen[i]) return;
-      seen[i] = 1;
-      var row = (a.e || [])[i];
-      if (!row || !hit(row.t)) return;
-      out.push({ where: '效果' + (i + 1) + (row.n ? '「' + row.n + '」' : ''), kind: 'e', row: i + 1 });
+    rows.forEach(function (r) {
+      var row = (a.e || [])[r.i];
+      if (!row || seen[r.i]) return;
+      if (!(row.t || []).some(function (x) { return want.has(x); })) return;
+      seen[r.i] = 1;
+      inRow = true;
+      out.push({ where: '效果' + (r.i + 1) + (row.n ? '「' + row.n + '」' : ''), kind: 'e', row: r.i + 1 });
     });
+    // 只出现在 tags 字段（或技能类型/特性）里的 tag：不在任何效果行内，位置直说
+    if (!inRow) {
+      if ((a.g || []).some(function (x) { return want.has(x); })) out.push({ where: 'tags字段', kind: 'g' });
+      if ((a.d || []).some(function (x) { return want.has(x); })) out.push({ where: '技能类型', kind: 'd' });
+      if ((a.m || []).some(function (x) { return want.has(x); })) {
+        var fs = index ? featsOf(index, a).filter(function (f) { return want.has(f.id); }) : [];
+        out.push({ where: '技能特性', kind: 'm', feats: fs });
+      }
+    }
     return out;
   }
 
@@ -638,12 +660,27 @@
     var heroSet = new Set(heroIds);
     var heroOut = 0;
     var notOut = 0;          // 被「反选」条件排除的技能条数（供界面说明「剩下」的算式）
-    var unitOut = 0;         // 条件分散在不同效果/位置 → 未命中（同效果匹配才统计）
+    var unitOut = 0;         // 效果类条件分散在不同效果条目 → 未命中（仅统计）
     var afterTag = 0;        // 通过全部 tag 条件（含反选）、进入前摇判定的条数
-    // 匹配粒度：默认「同一单元内」（同效果匹配）；false = 旧口径（整技能并集）
+    // 匹配粒度：默认「效果类 tag 必须落在同一个效果条目」；false = 旧口径（整技能并集）
     var matchUnit = query.matchUnit !== false;
-    // 只有反选（没有且/或）时没有可锚定的单元 → 按整个技能判定
+    // 只有反选（没有且/或）时没有可锚定的效果条目 → 按整个技能判定
     var pureNot = !andIds.length && !orIds.length;
+    var useRows = matchUnit && !pureNot && scope.e;
+
+    // 条件分流：效果类（同一效果条目内成立）vs 技能级（整条技能成立即可）
+    var effAnd = [], genAnd = [], effOr = [], genOr = [], effNot = [], genNot = [];
+    var splitConds = function (resolved, effArr, genArr) {
+      resolved.forEach(function (r) {
+        if (!r || !r.ids) { genArr.push(null); return; }        // 名称没解析出来：忽略该条（旧行为）
+        if (useRows && isEffectCond(index, r.ids)) effArr.push(r.ids);
+        else genArr.push(r.ids);
+      });
+    };
+    splitConds(rAnd, effAnd, genAnd);
+    splitConds(rOr, effOr, genOr);
+    splitConds(rNot, effNot, genNot);
+    var hasEffCond = !!(effAnd.length || effOr.length || effNot.length);
 
     index.abilities.forEach(function (a) {
       var ex = excludeKind(a);
@@ -651,19 +688,22 @@
       if (srcOn && !hasSource(a, srcSet)) { srcOut++; return; }
       if (heroOn && !hasHero(a, heroSet)) { heroOut++; return; }
 
-      var cands = (matchUnit && !pureNot)
-        ? candidatesOf(a, scope)
-        : [{ kind: 'any', label: '', set: tagSet(a, scope) }];
-      var matched = [], passedNoNot = false, ci;
-      for (ci = 0; ci < cands.length; ci++) {
-        if (!matchCand(cands[ci].set, andIds, orIds, null)) continue;
-        passedNoNot = true;
-        if (matchCand(cands[ci].set, andIds, orIds, notIds)) matched.push(cands[ci]);
-      }
-      if (!matched.length) {
-        if (passedNoNot) { notOut++; return; }                       // 只因反选被剔除
-        // 条件本身能被满足，只是分散在不同单元 → 记「不同效果」未命中
-        if (matchUnit && !pureNot && matchCand(tagSet(a, scope), andIds, orIds, notIds)) unitOut++;
+      var whole = tagSet(a, scope);
+      // 技能级条件：整条技能（类型 ∪ 特性 ∪ tags ∪ 所有效果）满足即可
+      var genOk = matchCand(whole, genAnd, genOr, genNot);
+      // 效果类条件：必须落在同一个效果条目里
+      var rows = (useRows && hasEffCond) ? effectRowsOf(a, scope, index) : null;
+      var matchedRows = rows
+        ? rows.filter(function (r) { return matchCand(r.set, effAnd, effOr, effNot); })
+        : [];
+      var ok = genOk && (!rows || matchedRows.length > 0);
+
+      if (!ok) {
+        // 只因反选被剔除？（去掉反选就能成立）
+        var rowsNoNot = rows ? rows.filter(function (r) { return matchCand(r.set, effAnd, effOr, null); }) : [];
+        if (matchCand(whole, genAnd, genOr, null) && (!rows || rowsNoNot.length)) { notOut++; return; }
+        // 条件本身都满足，只是效果类 tag 分散在不同效果条目 → 记「不同效果」未命中
+        if (rows && matchCand(whole, andIds, orIds, notIds)) unitOut++;
         return;
       }
       // 前摇区间（在 tag 条件之后应用，便于统计「因前摇被排除」的数量）
@@ -672,19 +712,27 @@
         if (!castPoints(a).length) { castMissing++; return; }
         if (!castInRange(a, castMin, castMax)) { castOut++; return; }
       }
-      var inMatched = function (ids) {
-        return matched.some(function (c) { return hasAny(c.set, ids); });
-      };
       var detail = [];
-      rAnd.forEach(function (r) {
-        if (r && r.ids) detail.push({ group: 'and', name: r.input, names: r.names, ids: r.ids, loc: locationsIn(a, r.ids, scope, index, matched) });
-      });
-      rOr.forEach(function (r) {
-        if (r && r.ids && inMatched(r.ids)) detail.push({ group: 'or', name: r.input, names: r.names, ids: r.ids, loc: locationsIn(a, r.ids, scope, index, matched) });
-      });
-      // 命中单元（同效果匹配时用于展示「这些 tag 落在哪一处」）
+      var pushDetail = function (r, group) {
+        if (!r || !r.ids) return;
+        if (useRows && isEffectCond(index, r.ids)) {
+          // 效果类条件：位置落在命中的效果条目里
+          if (!matchedRows.some(function (row) { return hasAny(row.set, r.ids); })) return;
+          detail.push({ group: group, name: r.input, names: r.names, ids: r.ids, unit: true,
+            loc: locationsInRows(a, r.ids, scope, index, matchedRows) });
+          return;
+        }
+        // 技能级条件：整个技能里任意位置命中都算
+        if (group === 'or' && !hasAny(whole, r.ids)) return;
+        detail.push({ group: group, name: r.input, names: r.names, ids: r.ids, unit: false,
+          loc: locations(a, r.ids, scope, index) });
+      };
+      rAnd.forEach(function (r) { pushDetail(r, 'and'); });
+      rOr.forEach(function (r) { pushDetail(r, 'or'); });
+
+      // 命中的效果条目（用于展示「这些效果类 tag 落在哪一条效果里」）
       var unitLabels = [];
-      matched.forEach(function (c) {
+      matchedRows.forEach(function (c) {
         if (c.label && unitLabels.indexOf(c.label) < 0) unitLabels.push(c.label);
       });
       // 被任一条件命中的技能特性（带内容），供详细展示
@@ -696,7 +744,7 @@
         return hitIds.indexOf(f.id) >= 0 && f.text;
       });
       hits.push({
-        id: a.i, name: a.n, en: a.en, heroes: heroesOf(index, a), tagCount: tagSet(a, scope).size,
+        id: a.i, name: a.n, en: a.en, heroes: heroesOf(index, a), tagCount: whole.size,
         detail: detail, feats: feats, unitLabels: unitLabels,
         ability: a, upgrades: upgrades(a), excluded: ex || null,
         cast: String(a.cp == null ? '' : a.cp), castVals: castPoints(a)
@@ -716,8 +764,22 @@
         effective: index.abilities.length - (index.excludedTotal || 0),
         includeExcluded: showExcluded,
         cast: { on: castOn, min: castMin, max: castMax, missing: castMissing, out: castOut },
-        unit: { on: matchUnit && !pureNot, matchUnit: matchUnit, pureNot: pureNot, out: unitOut },
-        not: { on: notIds.length > 0, out: notOut, afterTag: afterTag, unit: matchUnit && !pureNot, names: rNot.map(function (r) { return r && r.input || ''; }) },
+        unit: {
+          on: useRows && hasEffCond, matchUnit: matchUnit, pureNot: pureNot, out: unitOut,
+          mode: useRows && hasEffCond ? 'row' : 'skill',
+          // 效果类（须同一效果条目）/ 技能级（跨效果、类型、特性）条件各几条
+          eff: { and: effAnd.length, or: effOr.length, not: effNot.length },
+          skill: { and: genAnd.length, or: genOr.length, not: genNot.length }
+        },
+        not: {
+          on: notIds.length > 0, out: notOut, afterTag: afterTag, unit: useRows,
+          names: rNot.map(function (r) { return r && r.input || ''; }),
+          // 反选里哪些是效果类（只在命中的效果条目内排除）、哪些是技能级（出现即整条剔除）
+          effNames: rNot.filter(function (r) { return r && r.ids && useRows && isEffectCond(index, r.ids); })
+            .map(function (r) { return r.input; }),
+          genNames: rNot.filter(function (r) { return r && r.ids && !(useRows && isEffectCond(index, r.ids)); })
+            .map(function (r) { return r.input; })
+        },
         hero: heroStats(index, heroOn, heroIds, heroOut),
         src: sourceStats(index, srcKeys, srcOut)
       }
@@ -752,9 +814,11 @@
     noteStats: noteStats,
     tagSet: tagSet,
     locations: locations,
-    locationsIn: locationsIn,
-    unitsOf: unitsOf,
-    candidatesOf: candidatesOf,
+    locationsInRows: locationsInRows,
+    effectRowsOf: effectRowsOf,
+    isEffectTag: isEffectTag,
+    isEffectCond: isEffectCond,
+    EFFECT_C2: EFFECT_C2,
     matchCand: matchCand,
     describe: describe,
     resolveName: resolveName,
