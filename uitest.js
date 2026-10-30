@@ -24,6 +24,21 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(!!andBox, '页面初始化：找到「且」条件组');
     ok(andBox.querySelectorAll('.rowitem').length === 1, '初始 1 行', andBox.querySelectorAll('.rowitem').length);
 
+    // ---- 技能来源默认状态（现版本英雄技能 + 物品技能勾选；目录外技能默认不勾）----
+    const sChips0 = Array.prototype.slice.call(doc.querySelectorAll('#srcList .schip'));
+    ok(sChips0.length === 3, '来源列表 3 类（现版本英雄技能 / 物品技能 / 目录外技能）', sChips0.length);
+    ok(/现版本英雄技能/.test(sChips0[0].textContent) && sChips0[0].querySelector('input').checked,
+      '「现版本英雄技能」默认勾选');
+    ok(/目录外技能/.test(sChips0[2].textContent) && !sChips0[2].querySelector('input').checked,
+      '「目录外技能」默认不勾（旧版本残留不参与检索）');
+    ok(/已选 2 \/ 3 类/.test(doc.getElementById('srcSum').textContent), '来源摘要显示「已选 2 / 3 类」',
+      doc.getElementById('srcSum').textContent);
+    ok(+sChips0[0].querySelector('.cnt').textContent.replace(/\D/g, '') === window.__tagsearch.info().heroedSkills,
+      '「现版本英雄技能」条数 = 有 ability_map 归属的条目数',
+      sChips0[0].querySelector('.cnt').textContent.trim());
+    // 后续用例按「全部来源」口径跑（含目录外，等价于改造前的全库行为）
+    window.__tagsearch.setSources(['hero', 'item', 'orphan']);
+
     const inp = andBox.querySelector('input');
 
     // ---- 复现场景：输入 6 个字符（均无法匹配） ----
@@ -622,7 +637,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(!!doc.getElementById('paneSrc'), '左栏存在「技能筛选」卡片');
     ok(!doc.getElementById('paneHero') && !doc.getElementById('heroGrid'),
       '原「英雄筛选」卡片与英雄网格已移除');
-    ok(sChips().length === 2, '只列出已接入的来源（2 类：英雄技能 + 物品技能）', sChips().length);
+    ok(sChips().length === 3, '只列出已接入的来源（3 类：现版本英雄技能 + 物品技能 + 目录外技能）', sChips().length);
     ok(/现版本英雄技能/.test(sChips()[0].textContent), '来源选项为「现版本英雄技能」',
       sChips()[0].textContent.trim());
     ok(sChips()[0].querySelector('input').checked, '「现版本英雄技能」默认勾选');
@@ -661,7 +676,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
         { i: 9403, n: '物品一', en: 'item_one', src: 'item', d: [488], g: [], m: [], e: [], nt: [0] }
       ])
     }, '含物品技能');
-    ok(sChips().length === 2, '数据里出现新来源时自动多出勾选项', sChips().length);
+    ok(sChips().length === 3, '数据变化后来源勾选项仍为已接入的 3 类', sChips().length);
     const itemCb = srcCb(/物品技能/);
     ok(!!itemCb && !itemCb.checked, '手动取消过的来源，换数据后仍保持未勾选（选择状态沿用）');
     ok(/已选 1 \/ 2 类/.test(doc.getElementById('srcSum').textContent), '摘要反映「已选 1 / 2 类」',
@@ -682,6 +697,29 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
        typeof window.__tagsearch.setHeroes === 'function' &&
        typeof window.__tagsearch.sources === 'function', '自动化钩子保留 setSources / setHeroes / sources');
 
+    // ================= 目录外技能：勾「现版本英雄技能」时不许混进来（用户 bug） =================
+    window.__tagsearch.applyDb({
+      fetchedAt: '2026-10-30T00:00:00.000Z',
+      tags: [{ id: 488, name: '治疗', c1: '机制', c2: '包含效果' }],
+      notePool: [],
+      heroes: [{ i: 10, zh: '甲英雄', en: 'alpha', a: '力量' }],
+      abilities: [
+        { i: 9501, n: '现版本一', en: 'live_one', d: [488], g: [], m: [], e: [], h: [10] },
+        { i: 9502, n: '目录外一', en: 'orphan_one', d: [488], g: [], m: [], e: [], h: [] }
+      ]
+    }, '含目录外条目');
+    const tblText = () => doc.getElementById('tblbox').textContent;
+    window.__tagsearch.setSources(['hero']);
+    setAnd(['治疗']);
+    ok(+doc.getElementById('nHit').textContent === 1 && !/目录外一/.test(tblText()),
+      '勾「现版本英雄技能」后，目录外条目不再命中',
+      doc.getElementById('nHit').textContent + ' / ' + (tblText().match(/目录外一/) ? '含目录外' : '干净'));
+    window.__tagsearch.setSources(['orphan']);
+    ok(+doc.getElementById('nHit').textContent === 1 && /目录外一/.test(tblText()),
+      '改勾「目录外技能」后才出现该条目', doc.getElementById('nHit').textContent);
+    ok(/目录外技能/.test(tblText()), '结果行标出技能来源「目录外技能」');
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+
     // ================= 同名 tag：按类别区分 =================
     window.__tagsearch.applyDb({
       fetchedAt: '2026-10-30T00:00:00.000Z',
@@ -696,7 +734,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
       ]
     }, '合成测试数据（同名 tag）');
     // 上一段测试把来源改成「只物品」，这里恢复全选，否则新数据（hero）会被筛掉
-    window.__tagsearch.setSources(['hero', 'item']);
+    window.__tagsearch.setSources(['hero', 'item', 'orphan']);
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
 
     // 补全里同名 tag 应拆成「名称（类别）」

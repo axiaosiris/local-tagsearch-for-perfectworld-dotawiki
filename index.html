@@ -300,7 +300,9 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         <div class="srclist" id="srcList"></div>
         <div class="tip" style="margin:0">
           只检索勾选的<b>技能来源</b>（多选 = 并集），与 tag / 施法前摇条件同时生效。
-          目前有<b>现版本英雄技能</b>与<b>物品技能</b>两类；非英雄单位技能接入后会自动出现在这里。
+          <b>现版本英雄技能</b> = 后台「英雄数据 → 人工处理数据 → 技能」里登记在某英雄名下的条目（与《英雄技能目录》同口径）；
+          <b>目录外技能</b> = 技能总表里没有登记到任何英雄的旧版本残留 / 废弃天赋 / 通用条目，<b>默认不勾</b>。
+          非英雄单位技能接入后会自动出现在这里。
         </div>
       </div>
     </div>
@@ -559,10 +561,12 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   }
 
   // ---------- 技能筛选（按数据来源；登记表见 search-core.js 的 SOURCES） ----------
-  // 现已有「现版本英雄技能」「物品技能」两类；其余来源接入后，
+  // 现已有「现版本英雄技能」「物品技能」「目录外技能」三类；其余来源接入后，
   // 在登记表里把对应条目的 ready 改成 true，这里就会自动多出一个勾选项。
+  // 默认勾选除 def:false 以外的（目录外技能=旧版本残留，默认不参与检索）
   var SRC_READY = core.SOURCES.filter(function (s) { return s.ready; });
-  var srcSel = new Set(SRC_READY.map(function (s) { return s.key; }));   // 默认全勾
+  var srcSel = new Set(SRC_READY.filter(function (s) { return s.def !== false; })
+    .map(function (s) { return s.key; }));
 
   function srcMeta(key) {
     for (var i = 0; i < core.SOURCES.length; i++) {
@@ -672,9 +676,9 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
 
   function readHeroes() { return Array.from(heroSel); }
 
-  /** 结果表「技能」格下的英雄行（无归属则不显示）；非英雄来源改为显示来源名（如「物品技能」） */
+  /** 结果表「技能」格下的英雄行（无归属则不显示）；非英雄来源改为显示来源名（如「物品技能」「目录外技能」） */
   function heroLine(h) {
-    var key = String((h && h.ability && h.ability.src) || 'hero');
+    var key = core.srcOf(h && h.ability);
     if (key !== 'hero') return '<div class="hr">' + esc(srcMeta(key).label) + '</div>';
     var hs = h && h.heroes;
     if (!hs || !hs.length) return '';
@@ -947,10 +951,10 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         .map(function (k) { return k.label + ' <b>' + sb[k.key] + '</b>'; });
       var detail = parts.length ? '（' + parts.join(' / ') + '）' : '';
       if (r.stats.includeExcluded) {
-        html += '<div class="infobox" style="margin:12px 14px 0">已<b>包含</b>被排除项' + detail +
-          '，共 <b>' + r.stats.excludedTotal + '</b> 条 —— 下方这类条目已灰显并标注原因。</div>';
-      } else if (r.stats.excludedTotal) {
-        html += '<div class="infobox" style="margin:12px 14px 0">已默认排除 <b>' + r.stats.excludedTotal +
+        if (r.stats.poolExcluded) html += '<div class="infobox" style="margin:12px 14px 0">已<b>包含</b>被排除项' + detail +
+          '，共 <b>' + r.stats.poolExcluded + '</b> 条 —— 下方这类条目已灰显并标注原因。</div>';
+      } else if (r.stats.poolExcluded) {
+        html += '<div class="infobox" style="margin:12px 14px 0">已默认排除 <b>' + r.stats.poolExcluded +
           '</b> 条非技能条目' + detail + '，检索基于其余 <b>' + r.stats.effective +
           '</b> 条。如需查看，请勾选左侧「包含被排除项」。</div>';
       }
@@ -1029,8 +1033,8 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       html += '<div class="cmpgrid">';
       list.forEach(function (h, i) {
         var hn = (h.heroes || []).length ? '　英雄：' + heroNames(h.heroes.map(function (x) { return x.id; }), 3)
-          : (String((h.ability && h.ability.src) || 'hero') !== 'hero'
-            ? '　来源：' + srcLabel(String((h.ability && h.ability.src) || 'hero')) : '');
+          : (core.srcOf(h.ability) !== 'hero'
+            ? '　来源：' + srcLabel(core.srcOf(h.ability)) : '');
         html += '<div class="cmitem' + (h.excluded ? ' ex' : '') + '" title="' +
           esc((h.name || '(无名)') + '　#' + h.id + hn + '　点击查看详情') + '">' +
           '<span class="cmup">' + iconOnly(h.upgrades) + '</span>' +
@@ -1159,10 +1163,10 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         .map(function (k) { return k.label + ' <b>' + sb[k.key] + '</b>'; });
       var detail = parts.length ? '（' + parts.join(' / ') + '）' : '';
       if (r.stats.includeExcluded) {
-        html += '<div class="infobox" style="margin:12px 14px 0">已<b>包含</b>被排除项' + detail +
-          '，共 <b>' + r.stats.excludedTotal + '</b> 条 —— 下方这类条目已灰显并标注原因。</div>';
-      } else if (r.stats.excludedTotal) {
-        html += '<div class="infobox" style="margin:12px 14px 0">已默认排除 <b>' + r.stats.excludedTotal +
+        if (r.stats.poolExcluded) html += '<div class="infobox" style="margin:12px 14px 0">已<b>包含</b>被排除项' + detail +
+          '，共 <b>' + r.stats.poolExcluded + '</b> 条 —— 下方这类条目已灰显并标注原因。</div>';
+      } else if (r.stats.poolExcluded) {
+        html += '<div class="infobox" style="margin:12px 14px 0">已默认排除 <b>' + r.stats.poolExcluded +
           '</b> 条非技能条目' + detail + '，检索基于其余 <b>' + r.stats.effective + '</b> 条。</div>';
       }
     }
@@ -1188,8 +1192,8 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       html += '<div class="cmpgrid">';
       list.forEach(function (h, i) {
         var hn = (h.heroes || []).length ? '　英雄：' + heroNames(h.heroes.map(function (x) { return x.id; }), 3)
-          : (String((h.ability && h.ability.src) || 'hero') !== 'hero'
-            ? '　来源：' + srcLabel(String((h.ability && h.ability.src) || 'hero')) : '');
+          : (core.srcOf(h.ability) !== 'hero'
+            ? '　来源：' + srcLabel(core.srcOf(h.ability)) : '');
         html += '<div class="cmitem' + (h.excluded ? ' ex' : '') + '" title="' +
           esc((h.name || '(无名)') + '　#' + h.id + hn + '　命中 ' + h.matched + ' 行　点击查看详情') + '">' +
           '<span class="cmup">' + iconOnly(h.upgrades) + '</span>' +
@@ -1260,7 +1264,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   // ---------- 技能详情 ----------
   /** 详情弹窗的「所属英雄」段 */
   function heroSec(h) {
-    var key = String((h && h.ability && h.ability.src) || 'hero');
+    var key = core.srcOf(h && h.ability);
     if (key !== 'hero') {
       return '<div class="sec"><h4>技能来源</h4><span class="chip">' + esc(srcMeta(key).label) +
         '</span><span class="count" style="margin-left:8px">该来源没有英雄归属</span></div>';
@@ -1588,6 +1592,11 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     // 新数据可能没有某些英雄 → 剔除失效勾选，再重绘名册
     var alive = new Set((idx.heroes || []).map(function (h) { return h.i; }));
     Array.from(heroSel).forEach(function (id) { if (!alive.has(id)) heroSel.delete(id); });
+    // 技能来源同理：剔除新数据里不存在的来源；若一个不剩（例如只载入了目录外条目），
+    // 补勾数据里实际存在的来源，避免「载入成功却检索不到任何东西」
+    var srcAlive = (idx.sources || []);
+    Array.from(srcSel).forEach(function (k) { if (srcAlive.indexOf(k) < 0) srcSel.delete(k); });
+    if (!srcSel.size) srcAlive.forEach(function (k) { srcSel.add(k); });
     setMeta(); fillTagOptions(); revalidateAll(true);
     renderSrcList(); updateExpr();
     ulog('已载入数据：Tag ' + db.tags.length + ' 条 / 技能 ' + db.abilities.length +

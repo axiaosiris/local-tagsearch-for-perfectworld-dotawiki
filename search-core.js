@@ -27,8 +27,9 @@
  *         不做英文名推断；技能总表里残留的旧版本技能/废弃天赋登记不到任何英雄，
  *         启用英雄筛选时不会被命中（统计在 stats.hero.out）。
  *   sources: [来源 key…] 技能来源筛选（数据类别，见下方 SOURCES 登记表）——只保留所选来源的
- *         技能（并集）。技能侧来源看 a.src，**缺省视为 'hero'**（现版本英雄技能），故旧数据
- *         不写 src 即全部归入英雄技能。今后并入物品技能 / 非英雄单位技能时给技能写 src 即可。
+ *         技能（并集）。判定见 srcOf：写了 a.src 的按 src（物品技能 = 'item'）；没写 src 的
+ *         英雄技能条目按 a.h（ability_map 归属）分为 'hero'（有归属 = 现版本英雄技能）与
+ *         'orphan'（无归属 = 目录外：旧版本残留 / 废弃天赋 / 通用条目）。
  *         未勾选任何来源 = 不过滤（界面会拦住）；只勾了部分来源时统计在 stats.src.out。
  * 同名 tag 可能存在于多个档位（如「友方防御塔」有 目标/神杖/魔晶/天赋 四档）→ 命中任一档即算包含。
  * 技能特性（skill_mechanism）除词条外还有「特性内容」（mechanism_input）：
@@ -69,23 +70,32 @@
 
   /* ---------- 技能来源（数据类别）----------
    * 检索库今后不只有英雄技能：物品技能、非英雄单位技能等会陆续并入同一份数据。
-   * 约定：技能对象用 src 字段标注来源，**缺省（无 src）= 'hero'**，所以现有 data.js
-   * 无需改造就全部算「现版本英雄技能」。新增一类来源只需两步：
-   *   ① 在本登记表加一行、把 ready 改为 true（界面按此表自动渲染勾选项）；
-   *   ② 构建阶段给该来源的技能写入 src（build_data.py）。
-   * ready:false 的条目只是占位，界面不显示。 */
+   * 判定顺序（见 srcOf）：
+   *   ① 技能对象写了 src（物品技能 = 'item'，今后接入的来源照此写）→ 就用它；
+   *   ② 没写 src 的英雄技能条目，看 a.h（ability_map 归属）分两类：
+   *        有归属 → 'hero'   现版本英雄技能（与《英雄技能目录》同口径）
+   *        无归属 → 'orphan' 目录外技能（技能总表里残留的旧版本技能 / 废弃天赋 / 通用条目）
+   * 新增一类来源只需两步：① 在本登记表加一行、ready 改 true（界面按此表自动渲染勾选项）；
+   * ② 构建阶段给该来源的技能写 src（build_data.py）。
+   * ready:false 只是占位不显示；def:false = 界面默认不勾（目录外数据默认不参与检索）。 */
   var SOURCES = [
     { key: 'hero', label: '现版本英雄技能', ready: true,
-      tip: '后台「英雄数据 → 人工处理数据 → 技能」的现版本技能（含技能总表里残留的旧版本条目）' },
+      tip: '后台「英雄数据 → 人工处理数据 → 技能」里登记在某个英雄名下的现版本技能（与 编写规范/英雄技能目录.md 同口径）' },
     { key: 'item', label: '物品技能', ready: true,
       tip: '道具附带的技能（后台「内容管理 → 道具技能」），与英雄技能共用同一套标签；无英雄归属' },
+    { key: 'orphan', label: '目录外技能', ready: true, def: false,
+      tip: '技能总表里没有登记到任何英雄的条目：旧版本残留、废弃天赋、通用/测试条目——不属于现版本英雄技能（默认不勾）' },
     { key: 'creep', label: '非英雄单位技能', ready: false,
       tip: '野怪 / 小兵 / 召唤物 / Boss 的技能——数据尚未接入' }
   ];
   var SRC_DEFAULT = 'hero';
 
-  /** 某技能的来源 key（无 src 字段 = 英雄技能） */
-  function srcOf(a) { return String((a && a.src) || SRC_DEFAULT); }
+  /** 某技能的来源 key：写了 src 就用它；否则按英雄归属分为 hero（已登记）/ orphan（目录外） */
+  function srcOf(a) {
+    var s = String((a && a.src) || '');
+    if (s && s !== SRC_DEFAULT) return s;
+    return (a && a.h && a.h.length) ? 'hero' : 'orphan';
+  }
 
   /** 归一化来源 key 数组（去空、去重） */
   function normSources(list) {
@@ -105,6 +115,18 @@
     var n = 0;
     (index.abilities || []).forEach(function (a) { if (hasSource(a, srcSet)) n++; });
     return n;
+  }
+
+  /** 某来源集合下的条数与其中被排除（废弃/自定义/公式残条）的条数 */
+  function srcPool(index, srcSet) {
+    var n = 0, ex = 0, by = { noUse: 0, custom: 0, junk: 0 };
+    (index.abilities || []).forEach(function (a) {
+      if (!hasSource(a, srcSet)) return;
+      n++;
+      var k = excludeKind(a);
+      if (k) { ex++; by[k]++; }
+    });
+    return { n: n, ex: ex, by: by };
   }
 
   /** 统一构造 stats.src：on = 确实缩小了范围（只勾了数据里的部分来源） */
@@ -314,6 +336,9 @@
     var heroOut = 0;
     var hits = [];
     var skipped = 0;
+    // 基数随来源筛选走：只勾部分来源时，「其它来源」不算被排除（统计在 src.out）
+    var pool0 = srcOn ? srcPool(index, srcSet)
+      : { n: index.abilities.length, ex: index.excludedTotal || 0, by: index.excludedBy };
     var base = {
       terms: terms,
       hits: hits,
@@ -321,9 +346,10 @@
       stats: {
         total: index.abilities.length,
         excludedTotal: index.excludedTotal || 0,
-        excludedBy: index.excludedBy || { noUse: 0, custom: 0, junk: 0 },
+        poolExcluded: pool0.ex,
+        excludedBy: pool0.by || index.excludedBy || { noUse: 0, custom: 0, junk: 0 },
         skipped: 0,
-        effective: index.abilities.length - (index.excludedTotal || 0),
+        effective: pool0.n - pool0.ex,
         includeExcluded: showExcluded,
         noteSkills: noteStats(index).skills,
         hero: heroStats(index, heroOn, heroIds, 0),
@@ -848,6 +874,8 @@
       });
     });
     hits.sort(function (x, y) { return y.id - x.id; });
+    var pool1 = srcOn ? srcPool(index, srcSet)
+      : { n: index.abilities.length, ex: index.excludedTotal || 0, by: index.excludedBy };
     return {
       hits: hits,
       unknown: unknown,
@@ -856,9 +884,10 @@
       stats: {
         total: index.abilities.length,
         excludedTotal: index.excludedTotal || 0,
-        excludedBy: index.excludedBy || { noUse: 0, custom: 0, junk: 0 },
+        poolExcluded: pool1.ex,
+        excludedBy: pool1.by || index.excludedBy || { noUse: 0, custom: 0, junk: 0 },
         skipped: skipped,
-        effective: index.abilities.length - (index.excludedTotal || 0),
+        effective: pool1.n - pool1.ex,
         includeExcluded: showExcluded,
         cast: { on: castOn, min: castMin, max: castMax, missing: castMissing, out: castOut },
         unit: {

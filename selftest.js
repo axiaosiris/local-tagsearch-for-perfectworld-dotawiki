@@ -189,6 +189,21 @@ var realItems = idx.abilities.filter(function (a) { return a.src === 'item'; });
 var itemWithHero = realItems.filter(function (a) { return a.h && a.h.length; });
 console.log('  真实物品技能 ' + realItems.length + ' 条；误挂英雄归属的 ' + itemWithHero.length + ' 条（应为 0）' +
   (itemWithHero.length ? ' → ' + itemWithHero.slice(0, 3).map(function (a) { return a.i + ' ' + a.n; }).join('、') : ''));
+
+// 目录外技能：没写 src 的英雄技能条目里，**没有 ability_map 归属**的那些（旧版本残留 / 废弃天赋 / 通用条目）
+var noHeroAb = idx.abilities.filter(function (a) { return !a.src && !(a.h && a.h.length); });
+console.log('  来源拆分：现版本英雄技能 ' + idx.sourceCount.hero + ' 条 ｜ 目录外技能 ' + idx.sourceCount.orphan +
+  ' 条 ｜ 物品技能 ' + idx.sourceCount.item + ' 条（无 src 条目共 ' + noHeroAb.length + '+ 有归属 ' + idx.heroedSkills + '）');
+ok2(idx.sourceCount.hero === idx.heroedSkills, 'hero 条数 = 有 ability_map 归属的条目数（' + idx.heroedSkills + '）',
+  idx.sourceCount.hero);
+ok2(idx.sourceCount.hero + idx.sourceCount.orphan === idx.sourceCount.hero + noHeroAb.length,
+  '无 src 条目被完整拆成 hero / orphan，无交叉、无遗漏');
+// 用户 bug 复现：勾「现版本英雄技能」检索【无法行动】，结果里不许再出现目录外条目
+var rOrphanLeak = core.search(idx, { and: ['无法行动'], or: [], not: [], sources: ['hero'] });
+var leak = rOrphanLeak.hits.filter(function (h) { return !(h.heroes && h.heroes.length); });
+ok2(rOrphanLeak.hits.length > 0 && leak.length === 0,
+  '勾「现版本英雄技能」不再混入目录外技能（无法行动 ' + rOrphanLeak.hits.length + ' 条，泄漏 ' + leak.length + '）',
+  leak.slice(0, 3).map(function (h) { return h.name + '(' + h.id + ')'; }).join('、'));
 var readyKeys = core.SOURCES.filter(function (s) { return s.ready; }).map(function (s) { return s.key; });
 var baseQ = { and: ['防御塔'], or: [], not: [] };
 var rSrcAll = core.search(idx, { and: baseQ.and, or: [], not: [], sources: readyKeys });
@@ -214,9 +229,11 @@ var fake = core.createIndex({
 console.log('  模拟数据来源 = ' + JSON.stringify(fake.sources) + '，条数 ' + JSON.stringify(fake.sourceCount));
 var fItem = core.search(fake, { and: [], or: [], not: [], sources: ['creep'] });
 var fHero = core.search(fake, { and: [], or: [], not: [], sources: ['hero'] });
-var fBoth = core.search(fake, { and: [], or: [], not: [], sources: ['hero', 'creep'] });
-console.log('  只 creep ' + fItem.hits.length + ' ｜只 hero ' + fHero.hits.length + ' ｜两者 ' + fBoth.hits.length +
-  '（合计应 = 有效 ' + (fake.abilities.length - fake.excludedTotal) + '）');
+var fOrphan = core.search(fake, { and: [], or: [], not: [], sources: ['orphan'] });
+var fBoth = core.search(fake, { and: [], or: [], not: [], sources: ['hero', 'orphan', 'creep'] });
+console.log('  只 creep ' + fItem.hits.length + ' ｜只 hero ' + fHero.hits.length + ' ｜只 orphan ' + fOrphan.hits.length +
+  ' ｜hero+orphan+creep ' + fBoth.hits.length +
+  '（应 = ' + (fHero.hits.length + fOrphan.hits.length + fItem.hits.length) + '，即非物品有效条目）');
 console.log('  只 creep 的 stats.src = ' + JSON.stringify(fItem.stats.src));
 
 // ================= 匹配粒度：效果类 tag 须落在同一效果条目 =================
