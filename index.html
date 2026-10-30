@@ -71,6 +71,12 @@ header .meta b{color:#374151;font-weight:600}
 .btn:disabled{opacity:.5;cursor:not-allowed;background:#f6f7fa;color:#9aa4b2;border-color:var(--line)}
 .rowitem{display:block}
 .resol.soft{color:#98a2b3}
+/* 同名多义：输入行下方直接给出「有哪些含义 / 怎么写才精确」 */
+.resol.amb{color:#8a5a00;background:#fff9ef;border:1px solid #f0dcb4;border-radius:6px;padding:5px 8px;margin:0 0 7px 2px}
+.resol.amb code{background:#fff;border:1px solid #eadfc6;border-radius:4px;padding:0 4px;color:#7a4a00}
+.resol.amb code.fill{cursor:pointer}
+.resol.amb code.fill:hover{background:#f6ecd8;border-color:#dcc9a2}
+.resol .cat{margin-left:4px;padding:0 4px;border-radius:4px;font-size:10.5px;background:rgba(0,0,0,.05);border:1px solid rgba(0,0,0,.06)}
 .actions{display:flex;align-items:center;gap:10px;margin-top:12px}
 .fuzzy{font-size:12.5px;color:var(--sub);display:flex;align-items:flex-start;gap:6px;cursor:pointer;user-select:none}
 .fuzzy input{margin-top:3px;flex:none}
@@ -98,6 +104,11 @@ td.en{color:#9aa4b2;font-size:11.5px;word-break:break-all}
 .chip.or{border-color:#c9e9d5;background:#f2fbf5}
 /* 命中单元（同效果匹配时：这些 tag 落在同一个效果 / 位置里） */
 .chip.unit{border-color:#f0d9a8;background:#fff7e6;color:#8a5a00;font-weight:600}
+/* 同名 tag 的类别后缀 / 多义警示 */
+.chip .cat{margin-left:4px;padding:0 4px;border-radius:4px;font-size:10.5px;font-weight:500;
+  background:rgba(0,0,0,.05);color:var(--sub);border:1px solid rgba(0,0,0,.06);vertical-align:1px}
+.chip .cat.amb{background:#fff1f0;color:#b3261e;border-color:#f7c9c5;font-weight:600}
+.chip .cat.tie{background:#fff7e6;color:#8a5a00;border-color:#f0d9a8}
 .chip .loc{color:var(--sub);font-size:11px}
 /* 技能特性命中时，chip 内追加该特性的内容（详细展示用） */
 .chip .feat{display:block;margin-top:2px;padding-top:2px;border-top:1px dashed var(--chipb);
@@ -122,6 +133,24 @@ td.en{color:#9aa4b2;font-size:11.5px;word-break:break-all}
 .infobox{margin:0 0 12px;padding:9px 12px;border-radius:8px;background:#f2f7fd;border:1px solid #d3e2f4;
   color:#33587f;font-size:12.5px}
 .infobox b{color:#1a4b7f}
+/* 元信息里的可点入口 + 同名一览弹窗 */
+.meta .lnk{cursor:pointer;color:#1a4b7f;text-decoration:underline dotted;text-underline-offset:2px}
+.meta .lnk:hover{color:#0d6efd}
+.dupTbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.dupTbl th{text-align:left;font-weight:600;color:var(--sub);border-bottom:1px solid var(--line);padding:6px 8px}
+.dupTbl td{border-bottom:1px solid var(--line);padding:6px 8px;vertical-align:top}
+.dupTbl td.nm{font-weight:600;white-space:nowrap}
+.duptag{display:inline-block;margin:2px 4px 2px 0;padding:1px 6px;border-radius:5px;cursor:pointer;
+  background:var(--chip);border:1px solid var(--chipb);font-size:11.5px}
+.duptag:hover{background:#eef4ff;border-color:#c9d8f5}
+.duptag .loc{color:var(--sub);font-size:10.5px}
+.duptag.amb{background:#fff7f6;border-color:#f2cfcb}
+.duptag.amb:hover{background:#ffeceb}
+.dupTbl .cat{margin-left:5px;padding:0 4px;border-radius:4px;font-size:10.5px;font-weight:600;
+  background:#fff1f0;color:#b3261e;border:1px solid #f7c9c5}
+/* 提醒类（同名多义等）：淡橙底，别和普通说明混在一起 */
+.infobox.warn{background:#fff9ef;border-color:#f0dcb4;color:#7a5b12}
+.infobox.warn b{color:#8a5a00}
 /* 被排除项（勾选「包含被排除项」后出现） */
 tr.ex{background:#fafbfc}
 tr.ex td{opacity:.62}
@@ -140,6 +169,8 @@ tr.ex td.nm{font-style:italic}
 .expr .p.src{background:#0f9d58}
 .expr .p.unit{background:#b07d00}
 .expr .p.anyk{background:#8a94a2}
+/* 同名多义标记：小问号，悬停看含义 */
+.expr .p.amb{margin-left:2px;padding:0 4px;background:#b3261e;border-radius:4px;cursor:help}
 .expr .join{font-weight:700;color:var(--sub);margin:0 5px}
 .expr code{background:#fff;border:1px solid var(--line);border-radius:4px;padding:0 4px;
   font:11.5px/1.6 ui-monospace,Consolas,Menlo,monospace}
@@ -255,7 +286,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     <button class="mbtn on" data-mode="tag" title="按 tag（标签）检索技能">Tag 检索</button>
     <button class="mbtn" data-mode="note" title="在技能注释里查找文字">注释检索</button>
   </div>
-  <div class="meta">数据快照 <b id="mTime">—</b> ｜ Tag <b id="mTags">—</b> 条 ｜ 技能 <b id="mAbs">—</b> 条 ｜ 英雄 <b id="mHero">—</b> 个 ｜ 注释 <b id="mNotes">—</b> 条</div>
+  <div class="meta">数据快照 <b id="mTime">—</b> ｜ Tag <b id="mTags">—</b> 条 ｜ 技能 <b id="mAbs">—</b> 条 ｜ 英雄 <b id="mHero">—</b> 个 ｜ 注释 <b id="mNotes">—</b> 条 ｜ 同名 <b id="mDup" class="lnk" title="查看全部同名 tag（哪些只是多档位、哪些是不同含义）">—</b></div>
   <div class="hdact"><button class="btn" id="btnUpdate" title="从 partner 后台抓取最新数据">⟳ 更新本地数据</button></div>
 </header>
 
@@ -334,7 +365,9 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
           三类可<b>任意组合、同时生效</b>：命中 =（<b>且</b> 全部满足）<b>且</b>（<b>或</b> 至少一项）<b>且</b>（<b>非</b> 一个都不满足）。
           默认按<b>同一效果内</b>判断（勾选项可关）——「且」的多项必须在<b>同一个效果</b>里同时出现，
           不会出现「A 在效果1、B 在效果2」也算命中；「或」「非」同理。
-          上方「当前条件」会实时显示最终表达式。输入 tag 名称时会自动补全；若名称有多档（如「友方防御塔」含 目标/神杖/魔晶/天赋），命中任一档即算包含。
+          上方「当前条件」会实时显示最终表达式。输入 tag 名称时会自动补全；若名称有多档（如「友方防御塔」含 目标/神杖/魔晶/天赋），命中任一档即算包含。<br>
+          <b>同名不同义</b>（如「光环」= 施法类型 / 包含效果 / 驱散情况）在补全里会拆成「光环（施法类型）」这样的多条；
+          直接写光名字＝<b>全部含义一起匹配</b>，写成 <code>光环（施法类型）</code> / <code>光环#施法类型</code> 则只匹配该类别。
         </div>
       </div>
     </div>
@@ -706,8 +739,26 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     el.className = 'resol';
     inp.classList.remove('bad');
     inp.dataset.ids = res.ids.join(',');
+    // 同名多义且没指定类别 → 直接告诉用户有哪几种、怎么写才精确
+    if (res.ambiguous && !res.cat && res.groups && res.groups.length > 1) {
+      el.className = 'resol amb';
+      var base = String(res.input).trim();
+      el.innerHTML = '⚠ <em>' + esc(base) + '</em> 属于同名多义：' +
+        res.groups.map(function (g) {
+          return '<b>' + esc(g.cat) + '</b>（' + g.ids.length + ' 个 id' +
+            (g.variants && g.variants.length ? '：基础 + ' + esc(g.variants.join('/')) : '') + '）';
+        }).join('　/　') +
+        '　·　当前<b>全部含义一起匹配</b>（共 ' + res.ids.length + ' 个 id）<br>只匹配其中一种（点一下即填入）→ ' +
+        res.groups.map(function (g) {
+          var full = base + '（' + g.cat + '）';
+          return '<code class="fill" data-fill="' + esc(full) + '" title="' +
+            esc(full + ' · ' + g.ids.length + ' 个 id') + '">' + esc(full) + '</code>';
+        }).join('　');
+      return;
+    }
     var extra = res.exact ? '' : '（含子串匹配）';
     el.innerHTML = '→ <em>' + esc(res.names.join('、')) + '</em>' + extra +
+      (res.cat ? '<span class="cat">' + esc(res.cat) + '</span>' : '') +
       ' · ' + res.ids.length + ' 个档位 id';
   }
 
@@ -909,6 +960,18 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         r.stats.unit.out + '</b> 条技能虽然含全部 tag，但<b>效果类</b> tag 分散在不同效果条目里（例如 A 在效果1、B 在效果2），' +
         '未计入结果。取消左侧「效果类 tag 需同一效果条目」可改回「整技能合并判断」。</div>';
     }
+    if (r.stats && r.stats.ambig && r.stats.ambig.length) {
+      // 同名多义：提醒用户当前匹配的是「全部含义」，可改成只匹配某一种
+      html += '<div class="infobox warn" style="margin:12px 14px 0">' +
+        r.stats.ambig.map(function (a) {
+          var gs = a.groups || [];
+          return '「<b>' + esc(a.input) + '</b>」有 <b>' + gs.length + '</b> 种同名含义：' +
+            gs.map(function (g) { return '<b>' + esc(g.cat) + '</b>（' + g.ids.length + ' 个 id）'; }).join('、') +
+            '　—　当前<b>全部含义都在匹配</b>；若只想要其中一种，输入时写成 ' +
+            gs.map(function (g) { return '「' + esc(a.input) + '（' + esc(g.cat) + '）」'; }).join(' 或 ') +
+            '（补全列表里已按类别拆开）。';
+        }).join('<br>') + '</div>';
+    }
     if (r.stats && r.stats.not && r.stats.not.on) {
       var nt = r.stats.not;
       var nmTxt = nt.names.map(function (x) { return '「<b>' + esc(x) + '</b>」'; }).join('、');
@@ -1000,8 +1063,26 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
               featHtml += '<span class="feat"><b>' + esc(f.name) + '</b>' + esc(f.text) + '</span>';
             });
           });
+          // 同名多义：标出命中的是哪一个类别；未指定类别时警示「共 N 种含义」
+          var catHtml = '';
+          var g0 = (d.groups || []).filter(function (g) { return g.cat === d.cat; })[0];
+          if (d.cat) {
+            var vv = (g0 && g0.variants) || [];
+            // 名字里已经写了「（类别）」就不再重复类别名，只提示档位数
+            var named = String(d.name).indexOf('（' + d.cat + '）') >= 0 || String(d.name).indexOf('(' + d.cat + ')') >= 0;
+            var txt = (named ? '' : d.cat) + (vv.length ? (named ? '' : ' · ') + (vv.length + 1) + ' 档' : '');
+            if (txt) {
+              catHtml = '<span class="cat' + (vv.length ? ' tie' : '') + '"' +
+                (vv.length ? ' title="该类别含 ' + (vv.length + 1) + ' 档：基础 + ' +
+                  esc(vv.join('/')) + ' 变体，命中任一档即算"' : '') + '>' + esc(txt) + '</span>';
+            }
+          } else if (d.ambiguous && d.groups && d.groups.length > 1) {
+            catHtml = '<span class="cat amb" title="同名 tag 有多种含义：' +
+              esc(d.groups.map(function (g) { return g.cat + '（' + g.ids.length + ' 个 id）'; }).join('、')) +
+              '。全部含义都在匹配；要只匹配其中一种，用补全里带（类别）的写法。">共 ' + d.groups.length + ' 种含义</span>';
+          }
           return '<span class="chip ' + d.group + '">' +
-            (d.group === 'and' ? '且' : '或') + ' · ' + esc(d.name) +
+            (d.group === 'and' ? '且' : '或') + ' · ' + esc(d.name) + catHtml +
             (locs ? ' <span class="loc">@ ' + locs + '</span>' : '') + featHtml + '</span>';
         }).join('');
         html += '<tr' + (h.excluded ? ' class="ex"' : '') + '>' +
@@ -1194,11 +1275,22 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
 
   function openDetail(h) {
     var d = core.describe(idx, h.ability, scope());
+    /* 同名 tag（跨类别同名 / 同类别多档位）在详情里加类别小标，否则两个「光环」看着一模一样 */
+    var dupNames = idx.name2ids || new Map();
+    var catLabel = function (t) {
+      var v = core.catVariant(t.c2), c = core.catBase(t.c2);
+      return v ? v + ' · ' + c : c;
+    };
+    var chipOne = function (t) {
+      var ids = dupNames.get(t.name) || [];
+      var sub = ids.length > 1
+        ? '<span class="cat' + (core.catVariant(t.c2) ? ' tie' : '') + '">' + esc(catLabel(t)) + '</span>'
+        : '';
+      return '<span class="chip" title="' + esc((t.c1 || '') + ' / ' + (t.c2 || '') + ' · id=' + t.id) + '">' +
+        esc(t.name) + sub + '</span>';
+    };
     var names = function (arr) {
-      return arr.length ? arr.map(function (t) {
-        return '<span class="chip" title="' + esc(t.c1 + ' / ' + t.c2 + ' · id=' + t.id) + '">' +
-          esc(t.name) + '</span>';
-      }).join('') : '<span class="count">（无）</span>';
+      return arr.length ? arr.map(chipOne).join('') : '<span class="count">（无）</span>';
     };
     var body = '';
     if (d.upgrades && d.upgrades.length) {
@@ -1212,8 +1304,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     if (d.mech.length) {
       body += '<div class="sec"><h4>技能特性（机制项）</h4>' +
         d.mech.map(function (t) {
-          return '<div class="featrow"><span class="chip" title="' +
-            esc((t.c1 || '') + ' / ' + (t.c2 || '') + ' · id=' + t.id) + '">' + esc(t.name) + '</span>' +
+          return '<div class="featrow">' + chipOne(t) +
             (t.text ? '<div class="feattext">' + esc(t.text) + '</div>' : '') + '</div>';
         }).join('') + '</div>';
     }
@@ -1227,6 +1318,27 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     $('mBody').innerHTML = body || '<div class="empty">该技能在所选范围内没有任何 tag</div>';
     $('mask').classList.add('on');
   }
+  // 「名称（类别）」可直接点击填入输入框（多义提示 / 同名一览弹窗里都是）
+  document.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return;
+    var b = e.target.closest('.resol code[data-fill]');
+    var fromDup = false;
+    if (!b) { b = e.target.closest('.duptag[data-fill]'); fromDup = !!b; }
+    if (!b) return;
+    var val = b.getAttribute('data-fill');
+    var item = b.closest('.rowitem');
+    var inp = item && item.querySelector('input');
+    if (!inp) {                       // 从弹窗点进来 → 填「且」的第一行
+      var box = rowsOf('and');
+      if (!box.querySelector('.rowitem')) addRow('and', true);
+      inp = box.querySelector('.rowitem input');
+    }
+    if (!inp) return;
+    if (fromDup) $('mask').classList.remove('on');
+    inp.value = val;
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.focus();
+  });
   $('mClose').addEventListener('click', function () { $('mask').classList.remove('on'); });
   $('mask').addEventListener('click', function (e) { if (e.target === $('mask')) $('mask').classList.remove('on'); });
   document.addEventListener('keydown', function (e) {
@@ -1335,7 +1447,11 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     var rows = [['升级项', '技能名', '技能ID', '英文名', '英雄', '施法前摇', '升级项（占位符）', '命中条件', 'tag总数', '命中效果条目', '排除原因']];
     S.tag.result.hits.forEach(function (h) {
       var cond = h.detail.map(function (d) {
-        return (d.unit ? '[效果]' : '[技能]') + (d.group === 'and' ? '且:' : '或:') + d.name + '@' +
+        // 类别写进条件名：精确到类别的显示「名称（类别）」，多义的标注「多义N种」
+        var nm = d.name;
+        if (d.cat && nm.indexOf('（' + d.cat + '）') < 0 && nm.indexOf('(' + d.cat + ')') < 0) nm += '（' + d.cat + '）';
+        else if (!d.cat && d.ambiguous && d.groups && d.groups.length > 1) nm += '（多义' + d.groups.length + '种：' + d.groups.map(function (g) { return g.cat; }).join('/') + '）';
+        return (d.unit ? '[效果]' : '[技能]') + (d.group === 'and' ? '且:' : '或:') + nm + '@' +
           d.loc.map(function (l) { return l.where; }).join('/');
       }).join(' | ');
       // 反选/前摇是全库生效的过滤条件，不体现在单条命中详情里 → 单独补进「命中条件」列
@@ -1393,9 +1509,60 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     $('mHero').textContent = (idx.heroes && idx.heroes.length)
       ? (heroList().length + '（有技能，名册 ' + idx.heroes.length + '）')
       : '无';
+    var dupN = 0;
+    idx.names.forEach(function (n) { if ((idx.name2ids.get(n) || []).length > 1) dupN++; });
+    $('mDup').textContent = dupN ? (dupN + ' 组（多义 ' + idx.ambiguous.size + '）') : '无';
   }
+  /** 同名 tag 一览（meta 行的「同名 N」点开） */
+  function openDup() {
+    if (!idx || !idx.name2groups) return;
+    /* 同名 = 一个名字对应多个 id（含同类别多档位）；跨类别（gs.length > 1）才是真歧义 */
+    var groups = [];
+    idx.names.forEach(function (n) {
+      var ids = idx.name2ids.get(n) || [];
+      if (ids.length > 1) groups.push({ n: n, gs: idx.name2groups.get(n) || [], ids: ids });
+    });
+    groups.sort(function (a, b) {
+      return ((b.gs.length > 1 ? 1 : 0) - (a.gs.length > 1 ? 1 : 0)) ||
+        (b.ids.length - a.ids.length) || String(a.n).localeCompare(String(b.n), 'zh-Hans-CN');
+    });
+    var ambN = groups.filter(function (g) { return g.gs.length > 1; }).length;
+    var html = '<div class="sec"><h4>同名 tag 一览</h4><div class="count">' +
+      '共 <b>' + groups.length + '</b> 个名字对应多个 tag。' +
+      '<span style="color:#b3261e">红色</span> = 跨类别同名（<b>' + ambN + '</b> 个，含义不同，建议写「名称（类别）」）；' +
+      '灰色 = 同一类别的多个档位（基础 + 升级变体，命中任一档即算）。点击任意含义即填入「且」的第一行。</div></div>' +
+      '<table class="dupTbl"><thead><tr><th style="width:150px">名称</th><th>含义（类别 · id 数 · 升级变体）</th></tr></thead><tbody>';
+    groups.forEach(function (g) {
+      var amb = g.gs.length > 1;
+      html += '<tr><td class="nm">' + esc(g.n) +
+        (amb ? ' <span class="cat amb">多义</span>' : '') + '</td><td>' +
+        g.gs.map(function (x) {
+          return '<span class="duptag' + (amb ? ' amb' : '') + '" data-fill="' + esc(g.n + '（' + x.cat + '）') + '"' +
+            ' title="' + esc(g.n + '（' + x.cat + '） · ' + x.ids.length + ' 个 id：' + x.ids.join(',') + '') + '">' +
+            esc(x.cat) + ' <span class="loc">' + x.ids.length + ' id' +
+            (x.variants.length ? ' · +' + esc(x.variants.map(function (v) { return v.v || v; }).join('/')) : '') +
+            '</span></span>';
+        }).join(' ') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    $('mTitle').innerHTML = '同名 tag：' + groups.length + ' 组（跨类别多义 ' + ambN + '）';
+    $('mBody').innerHTML = html;
+    $('mask').classList.add('on');
+  }
+  $('mDup').addEventListener('click', openDup);
+
   function fillTagOptions() {
-    dl.innerHTML = idx.names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
+    /* 补全项：普通 tag 用原名；同名多义的展开成「名称（类别）」多条，避免选到另一个含义 */
+    var opts = [];
+    idx.names.forEach(function (n) {
+      var gs = idx.name2groups ? (idx.name2groups.get(n) || []) : [];
+      if (gs.length > 1) {
+        gs.forEach(function (g) { opts.push(n + '（' + g.cat + '）'); });
+      } else {
+        opts.push(n);
+      }
+    });
+    dl.innerHTML = opts.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
   }
 
   function ulog(msg, cls) {
@@ -1851,7 +2018,16 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   function updateExpr() {
     var e = $('expr'); if (!e) return;
     var a = collect('and'), o = collect('or'), n = collect('not');
-    var esc2 = function (x) { return esc(x); };
+    // 同名多义的名字在表达式里标一个「?」，鼠标悬停看有哪几种含义
+    var ambGroups = (idx && idx.name2groups) ? idx.name2groups : null;
+    var esc2 = function (x) {
+      var gs = ambGroups ? (ambGroups.get(String(x).trim()) || []) : [];
+      if (gs.length > 1) {
+        return esc(x) + '<span class="p amb" title="同名多义：' +
+          esc(gs.map(function (g) { return g.cat; }).join(' / ')) + '，当前匹配全部含义">?</span>';
+      }
+      return esc(x);
+    };
     var seg = [];
     if (a.length) seg.push('(<span class="p and">且</span>' + a.map(esc2).join(' <span class="join">且</span> ') + ')');
     if (o.length) seg.push('(<span class="p or">或</span>' + o.map(esc2).join(' <span class="join">或</span> ') + ')');

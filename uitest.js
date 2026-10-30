@@ -682,6 +682,105 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
        typeof window.__tagsearch.setHeroes === 'function' &&
        typeof window.__tagsearch.sources === 'function', '自动化钩子保留 setSources / setHeroes / sources');
 
+    // ================= 同名 tag：按类别区分 =================
+    window.__tagsearch.applyDb({
+      fetchedAt: '2026-10-30T00:00:00.000Z',
+      tags: [{ id: 701, name: '测试光环', c1: '机制', c2: '施法类型' },
+             { id: 702, name: '测试光环', c1: '机制', c2: '包含效果' },
+             { id: 703, name: '测试光环', c1: '机制', c2: '神杖升级施法类型' }],
+      notePool: [],
+      abilities: [
+        { i: 9601, n: '施法型技能', en: 'cast_one', d: [], g: [], m: [], e: [{ n: '效果甲', t: [701] }] },
+        { i: 9602, n: '效果型技能', en: 'eff_one', d: [], g: [], m: [], e: [{ n: '效果甲', t: [702] }] },
+        { i: 9603, n: '神杖档技能', en: 'sce_one', d: [], g: [], m: [], e: [{ n: '效果甲', t: [703] }] }
+      ]
+    }, '合成测试数据（同名 tag）');
+    // 上一段测试把来源改成「只物品」，这里恢复全选，否则新数据（hero）会被筛掉
+    window.__tagsearch.setSources(['hero', 'item']);
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    // 补全里同名 tag 应拆成「名称（类别）」
+    const opts = Array.prototype.map.call(doc.querySelectorAll('#tagOptions option'), (o) => o.value);
+    ok(opts.indexOf('测试光环（施法类型）') >= 0 && opts.indexOf('测试光环（包含效果）') >= 0,
+      '补全列表把同名 tag 拆成「名称（类别）」多条',
+      opts.filter((v) => /测试光环/.test(v)).join(' / '));
+
+    // 只写名字 → 多义提示 + 全部含义一起匹配
+    const andIn = () => doc.querySelectorAll('.grp[data-k="and"] .rows input');
+    andIn()[0].value = '测试光环';
+    andIn()[0].dispatchEvent(new window.Event('input', { bubbles: true }));
+    const ambTip = doc.querySelector('.grp[data-k="and"] .resol');
+    ok(ambTip && /同名多义/.test(ambTip.textContent), '输入同名 tag 时提示「同名多义」');
+    ok(/施法类型/.test(ambTip.textContent) && /包含效果/.test(ambTip.textContent),
+      '提示里列出全部含义', ambTip.textContent.replace(/\s+/g, ' ').trim().slice(0, 80));
+    ok(/测试光环（包含效果）/.test(ambTip.textContent), '提示里给出精确写法');
+
+    // 点击提示里的「名称（类别）」→ 直接填入并重算
+    const fillBtn = doc.querySelector('.grp[data-k="and"] .resol code[data-fill]');
+    ok(!!fillBtn, '多义提示里给出可点击的精确写法', fillBtn && fillBtn.getAttribute('data-fill'));
+    if (fillBtn) {
+      fillBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+      ok(andIn()[0].value === fillBtn.getAttribute('data-fill'), '点击后自动填入「名称（类别）」', andIn()[0].value);
+      ok(!/同名多义/.test(doc.querySelector('.grp[data-k="and"] .resol').textContent), '填入后提示切换为「已指定类别」');
+    }
+
+    // 还原成只有名字，继续验证多义检索
+    andIn()[0].value = '测试光环';
+    andIn()[0].dispatchEvent(new window.Event('input', { bubbles: true }));
+    doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 3, '不带类别 → 两种含义全匹配（含神杖档，3 条）',
+      doc.getElementById('nHit').textContent);
+    ok(doc.querySelectorAll('#tblbox .chip .cat.amb').length === 3, '结果行标出「共 N 种含义」',
+      doc.querySelectorAll('#tblbox .chip .cat.amb').length);
+    ok(/同名含义/.test(doc.getElementById('tblbox').textContent), '结果区给出多义说明');
+
+    // 写成「名称（类别）」→ 只匹配该类别
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+    andIn()[0].value = '测试光环（包含效果）';
+    andIn()[0].dispatchEvent(new window.Event('input', { bubbles: true }));
+    ok(!/同名多义/.test(doc.querySelector('.grp[data-k="and"] .resol').textContent), '指定类别后不再提示多义');
+    doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 1 &&
+       /效果型技能/.test(doc.getElementById('tblbox').textContent),
+      '「测试光环（包含效果）」只命中效果型技能', doc.getElementById('nHit').textContent);
+    ok(!/同名含义/.test(doc.getElementById('tblbox').textContent), '结果区不再提示多义');
+
+    // 类别 + 档位：写法基类别 = 命中任一档
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+    andIn()[0].value = '测试光环（施法类型）';
+    andIn()[0].dispatchEvent(new window.Event('input', { bubbles: true }));
+    doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 2 &&
+       /施法型技能/.test(doc.getElementById('tblbox').textContent) &&
+       /神杖档技能/.test(doc.getElementById('tblbox').textContent) &&
+       !/效果型技能/.test(doc.getElementById('tblbox').textContent),
+      '「（施法类型）」只取该类别的所有档（基础 + 神杖升级），不含其它类别',
+      doc.getElementById('nHit').textContent);
+
+    // 详情面板里同名 tag 也带类别小标
+    doc.querySelector('#tblbox [data-detail]').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(doc.querySelectorAll('#mBody .chip .cat').length >= 1, '详情面板为同名 tag 标注类别',
+      doc.querySelectorAll('#mBody .chip .cat').length);
+    doc.getElementById('mClose').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    // 同名一览弹窗：能列出同名 tag、点含义直接填入
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(/\d+ 组（多义 \d+）/.test(doc.getElementById('mDup').textContent), '元信息显示同名 tag 组数（含跨类别数）',
+      doc.getElementById('mDup').textContent);
+    doc.getElementById('mDup').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(doc.getElementById('mask').classList.contains('on'), '点「同名 N」打开一览弹窗');
+    ok(/同名 tag/.test(doc.getElementById('mTitle').textContent), '弹窗标题说明是同名 tag',
+      doc.getElementById('mTitle').textContent);
+    ok(doc.querySelectorAll('#mBody .duptag').length >= 2, '弹窗列出该名的全部含义',
+      doc.querySelectorAll('#mBody .duptag').length);
+    const dupBtn = doc.querySelector('#mBody .duptag[data-fill]');
+    dupBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(!doc.getElementById('mask').classList.contains('on'), '点含义后关闭弹窗');
+    ok(andIn()[0].value === dupBtn.getAttribute('data-fill'), '点含义后填入「且」条件',
+      andIn()[0].value);
+
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+
     console.log(fails ? `\n${fails} 项失败` : '\n全部通过');
     process.exit(fails ? 1 : 0);
   })

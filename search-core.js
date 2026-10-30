@@ -117,15 +117,59 @@
     };
   }
 
+  /* ---------- 同名 tag：按「类别」分组 ----------
+   * 同一个名字可能挂在完全不同的类别下（如「光环」= 施法类型 / 包含效果 / 驱散情况），
+   * 也可能只是同一类别的多个档位（施法类型 + 神杖/魔晶/天赋/命石升级变体）。
+   * name2groups 把同名 tag 按「基础类别」归组：一组 = 一个含义，组内是它的各档位。
+   * 组数 > 1 → 该名字有歧义（ambiguous），输入时可写「名称（类别）」精确指定。 */
+  var CAT_PREFIX = ['其他技能来源升级', '神杖升级', '魔晶升级', '天赋升级', '命石升级', '多样施法'];
+  /* 同义类别归一：分类树里放错了组、但指的是同一件事 */
+  var CAT_ALIAS = { '耗魔类型': '魔法消耗' };
+  var CAT_ALIAS_NAME = { '耗魔类型': '魔法消耗' };
+
+  /** c2 原文 → 基础类别（去掉升级变体前缀、同义归一） */
+  function catBase(c2) {
+    var s = String(c2 || '');
+    for (var i = 0; i < CAT_PREFIX.length; i++) {
+      var p = CAT_PREFIX[i];
+      if (s.length > p.length && s.indexOf(p) === 0) { s = s.slice(p.length); break; }
+    }
+    return CAT_ALIAS[s] || s;
+  }
+  /** c2 原文 → 变体短名（神杖 / 魔晶 / 天赋 / 命石 / 多样施法 / 其他来源；无变体 = ''） */
+  function catVariant(c2) {
+    var s = String(c2 || '');
+    for (var i = 0; i < CAT_PREFIX.length; i++) {
+      var p = CAT_PREFIX[i];
+      if (s.length > p.length && s.indexOf(p) === 0) {
+        return p.replace(/升级$/, '').replace('其他技能来源', '其他来源');
+      }
+    }
+    return '';
+  }
+
   function createIndex(db) {
     var id2tag = new Map();
     var name2ids = new Map();
+    var name2groups = new Map();     // name → [{cat, ids, variants:[{v,id}]}]，按首次出现顺序
     (db.tags || []).forEach(function (t) {
       id2tag.set(t.id, t);
       var arr = name2ids.get(t.name);
       if (!arr) { arr = []; name2ids.set(t.name, arr); }
       if (arr.indexOf(t.id) < 0) arr.push(t.id);
+      // 按基础类别归组
+      var cat = catBase(t.c2), variant = catVariant(t.c2);
+      var gs = name2groups.get(t.name);
+      if (!gs) { gs = []; name2groups.set(t.name, gs); }
+      var g = null;
+      for (var i = 0; i < gs.length; i++) { if (gs[i].cat === cat) { g = gs[i]; break; } }
+      if (!g) { g = { cat: cat, ids: [], variants: [] }; gs.push(g); }
+      if (g.ids.indexOf(t.id) < 0) g.ids.push(t.id);
+      if (variant) g.variants.push({ v: variant, id: t.id });
     });
+    /* 歧义名：同名跨了 2 个以上基础类别 */
+    var ambiguous = new Map();
+    name2groups.forEach(function (gs, n) { if (gs.length > 1) ambiguous.set(n, gs); });
     var names = Array.from(name2ids.keys()).sort(function (a, b) {
       return String(a).localeCompare(String(b), 'zh-Hans-CN');
     });
@@ -164,6 +208,8 @@
       db: db,
       id2tag: id2tag,
       name2ids: name2ids,
+      name2groups: name2groups,
+      ambiguous: ambiguous,
       names: names,
       abilities: abilities,
       featText: db.featText || {},
@@ -527,24 +573,73 @@
     return out;
   }
 
+  /* ---------- 名称解析 ----------
+   * 「名称（类别）」/「名称(类别)」/「名称#类别」/「名称/类别」→ 只取该类别那一组 id。
+   * 后缀只有在「前半段是已知 tag 名、后半段能唯一匹配某个类别」时才认，所以
+   * 名字里本来就带 / 的（如「开关/切换」）不会被误拆。 */
+  function splitCat(index, n) {
+    if (!index.name2groups) return null;
+    var cands = [];
+    var m = n.match(/^(.*?)\s*[（(]\s*([^（）()]+?)\s*[）)]\s*$/);
+    if (m) cands.push([m[1], m[2]]);
+    var hp = n.indexOf('#');
+    if (hp > 0) cands.push([n.slice(0, hp), n.slice(hp + 1)]);
+    var sp = n.lastIndexOf('/');
+    if (sp > 0) cands.push([n.slice(0, sp), n.slice(sp + 1)]);
+    for (var i = 0; i < cands.length; i++) {
+      var nm = cands[i][0].trim(), ct = cands[i][1].trim();
+      if (!nm || !ct) continue;
+      var gs = index.name2groups.get(nm);
+      if (!gs) continue;
+      var hit = gs.filter(function (g) {
+        return g.cat === ct || g.cat.indexOf(ct) >= 0 || ct.indexOf(g.cat) >= 0 ||
+          g.variants.some(function (v) { return v.v === ct; });
+      });
+      if (hit.length === 1) return { name: nm, cat: hit[0].cat, ids: hit[0].ids.slice() };
+    }
+    return null;
+  }
+
   /** 把用户输入解析为 tag id 集合：精确优先，未命中则按子串匹配（如「防御塔」→ 友方/敌方防御塔） */
   function resolveName(index, raw, fuzzy) {
     var n = String(raw || '').trim();
     if (!n) return null;
+    var sc = splitCat(index, n);
+    if (sc) {
+      return {
+        input: n, names: [sc.name], ids: sc.ids, exact: true, cat: sc.cat,
+        ambiguous: false, groups: (index.name2groups.get(sc.name) || []).map(groupBrief)
+      };
+    }
     var exactIds = index.name2ids.get(n);
+    var gs = index.name2groups ? (index.name2groups.get(n) || []) : [];
+    var info = {
+      cat: gs.length === 1 ? gs[0].cat : null,
+      ambiguous: gs.length > 1,
+      groups: gs.map(groupBrief)
+    };
     if (exactIds && !fuzzy) {
-      return { input: n, names: [n], ids: exactIds.slice(), exact: true };
+      return { input: n, names: [n], ids: exactIds.slice(), exact: true, cat: info.cat, ambiguous: info.ambiguous, groups: info.groups };
     }
     var hits = index.names.filter(function (x) { return x.indexOf(n) >= 0; });
     if (!hits.length) {
-      if (exactIds) return { input: n, names: [n], ids: exactIds.slice(), exact: true };
-      return { input: n, names: [], ids: null, exact: false };
+      if (exactIds) return { input: n, names: [n], ids: exactIds.slice(), exact: true, cat: info.cat, ambiguous: info.ambiguous, groups: info.groups };
+      return { input: n, names: [], ids: null, exact: false, cat: null, ambiguous: false, groups: [] };
     }
     var ids = [];
     hits.forEach(function (x) {
       index.name2ids.get(x).forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); });
     });
-    return { input: n, names: hits, ids: ids, exact: (hits.length === 1 && hits[0] === n) };
+    return {
+      input: n, names: hits, ids: ids, exact: (hits.length === 1 && hits[0] === n),
+      cat: null, ambiguous: hits.some(function (x) { return index.name2groups && index.name2groups.has(x) && index.name2groups.get(x).length > 1; }),
+      groups: []
+    };
+  }
+
+  /** 组信息的精简版（给界面提示用） */
+  function groupBrief(g) {
+    return { cat: g.cat, ids: g.ids.slice(), variants: g.variants.map(function (v) { return v.v; }) };
   }
 
   /* ---------- 升级项（升级来源） ----------
@@ -719,12 +814,14 @@
           // 效果类条件：位置落在命中的效果条目里
           if (!matchedRows.some(function (row) { return hasAny(row.set, r.ids); })) return;
           detail.push({ group: group, name: r.input, names: r.names, ids: r.ids, unit: true,
+            cat: r.cat || null, ambiguous: !!r.ambiguous, groups: r.groups || [],
             loc: locationsInRows(a, r.ids, scope, index, matchedRows) });
           return;
         }
         // 技能级条件：整个技能里任意位置命中都算
         if (group === 'or' && !hasAny(whole, r.ids)) return;
         detail.push({ group: group, name: r.input, names: r.names, ids: r.ids, unit: false,
+          cat: r.cat || null, ambiguous: !!r.ambiguous, groups: r.groups || [],
           loc: locations(a, r.ids, scope, index) });
       };
       rAnd.forEach(function (r) { pushDetail(r, 'and'); });
@@ -781,7 +878,16 @@
             .map(function (r) { return r.input; })
         },
         hero: heroStats(index, heroOn, heroIds, heroOut),
-        src: sourceStats(index, srcKeys, srcOut)
+        src: sourceStats(index, srcKeys, srcOut),
+        // 同名多义：输入了不带（类别）的名字 → 提示它同时命中哪几种含义
+        ambig: [rAnd, rOr, rNot].reduce(function (acc, arr) {
+          arr.forEach(function (r) {
+            if (!r || !r.ambiguous || r.cat) return;
+            if (acc.some(function (x) { return x.input === r.input; })) return;
+            acc.push({ input: r.input, groups: r.groups || [] });
+          });
+          return acc;
+        }, [])
       }
     };
   }
@@ -822,6 +928,9 @@
     matchCand: matchCand,
     describe: describe,
     resolveName: resolveName,
+    splitCat: splitCat,
+    catBase: catBase,
+    catVariant: catVariant,
     upgrades: upgrades,
     castPoints: castPoints,
     castInRange: castInRange,

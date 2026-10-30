@@ -290,3 +290,48 @@ var pcUnion = core.search(idx, { not: ['眩晕'], scope: SCOPEFULL, matchUnit: f
 console.log('  只填反选 非:眩晕 → ' + pcUnit.hits.length + ' ／ ' + pcUnion.hits.length +
   '　' + (pcUnit.hits.length === pcUnion.hits.length ? '✓ 两种口径一致（无锚点时按整技能判定）' : '✗ 不一致'));
 
+
+// ================= 同名 tag：按类别区分 =================
+console.log('\n[同名 tag：按类别区分]');
+function ok2(cond, label, extra) {
+  console.log('  ' + (cond ? '✓' : '✗') + ' ' + label + (extra != null && !cond ? '（' + extra + '）' : ''));
+  return cond;
+}
+console.log('  同名 tag 组 ' + (idx.names.filter(function (n) { return idx.name2ids.get(n).length > 1; }).length) +
+  ' 个，其中跨类别（真歧义）' + idx.ambiguous.size + ' 个：' + Array.from(idx.ambiguous.keys()).join('、'));
+
+// 分组：一组合并同义类别（耗魔类型 → 魔法消耗），多组 = 多义
+ok2(idx.name2groups.get('定值魔法消耗').length === 1, '同义类别合并：定值魔法消耗 只有 1 组', idx.name2groups.get('定值魔法消耗').length);
+ok2(idx.name2groups.get('光环').length === 3, '光环 → 3 组（驱散情况 / 施法类型 / 包含效果）', idx.name2groups.get('光环').length);
+var hg = idx.name2groups.get('光环').filter(function (g) { return g.cat === '施法类型'; })[0];
+ok2(hg && hg.ids.length === 7 && hg.variants.length === 6, '「光环（施法类型）」含 7 档：基础 + 6 个升级变体',
+  hg ? hg.ids.length + '档/变体' + hg.variants.length : '无');
+
+// 解析：带类别 = 只取该组；不带 = 全部含义；名字里本来有 / 的不误拆
+var rAll = core.resolveName(idx, '光环', false);
+var rCast = core.resolveName(idx, '光环（施法类型）', false);
+var rEff = core.resolveName(idx, '光环(包含效果)', false);
+var rDis = core.resolveName(idx, '光环#驱散情况', false);
+var rSlash = core.resolveName(idx, '开关/切换', false);
+ok2(rAll.ambiguous === true && rAll.ids.length === 9, '「光环」不带类别 → 多义，9 个 id 全部匹配', rAll.ids.length);
+ok2(rCast.cat === '施法类型' && rCast.ids.length === 7 && !rCast.ambiguous, '「光环（施法类型）」→ 只取施法类型 7 个 id', rCast.cat + '/' + rCast.ids.length);
+ok2(rEff.cat === '包含效果' && rEff.ids.length === 1, '「光环(包含效果)」半角括号同样生效', rEff.ids.length);
+ok2(rDis.cat === '驱散情况' && rDis.ids.length === 1, '「光环#驱散情况」用 # 也生效', rDis.ids.length);
+ok2(rSlash.cat === '施法类型' && rSlash.ids.length === 6, '名字自带「/」的（开关/切换）不被误拆', rSlash.cat + '/' + rSlash.ids.length);
+ok2(core.resolveName(idx, '神杖升级（升级）', false).ids.join() === '1046', '短类别名「升级」能匹配到「升级来源」', core.resolveName(idx, '神杖升级（升级）', false).cat);
+
+// 检索：精确类别 ⊂ 全部含义；每条命中的 detail 都标明类别
+var hAll = core.search(idx, { and: ['光环'] });
+var hCast = core.search(idx, { and: ['光环（施法类型）'] });
+var hEff = core.search(idx, { and: ['光环（包含效果）'] });
+console.log('  命中数：光环 ' + hAll.hits.length + ' ／ 光环（施法类型）' + hCast.hits.length +
+  ' ／ 光环（包含效果）' + hEff.hits.length);
+ok2(hCast.hits.length + hEff.hits.length >= hAll.hits.length, '按类别检索的并集覆盖「全部含义」的结果', hCast.hits.length + hEff.hits.length + ' < ' + hAll.hits.length);
+ok2(hCast.hits.every(function (h) { return h.detail.every(function (d) { return d.cat === '施法类型'; }); }), '精确类别命中的 detail 只标该类别');
+ok2(hAll.hits.every(function (h) { return h.detail[0].ambiguous === true && h.detail[0].groups.length === 3; }), '多义命中的 detail 带 groups（3 种含义）');
+ok2(hAll.stats.ambig.length === 1 && hAll.stats.ambig[0].input === '光环', 'stats.ambig 汇总多义条件', JSON.stringify(hAll.stats.ambig.map(function (a) { return a.input; })));
+ok2(core.search(idx, { and: ['光环（施法类型）'] }).stats.ambig.length === 0, '指定类别后不再报多义');
+
+// 档位原则不变：写基础类别 = 命中任一档（含神杖/魔晶/天赋/命石变体）
+var upIds = idx.name2groups.get('光环').filter(function (g) { return g.cat === '施法类型'; })[0].variants.map(function (v) { return v.v; });
+ok2(upIds.length === 6 && upIds.indexOf('神杖') >= 0 && upIds.indexOf('命石') >= 0, '变体覆盖神杖/魔晶/天赋/命石/多样施法/其他来源', upIds.join(','));
