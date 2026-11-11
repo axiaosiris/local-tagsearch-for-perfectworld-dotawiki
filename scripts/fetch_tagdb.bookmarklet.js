@@ -9,6 +9,7 @@
 //   abilities = 「技能」全量 [{i,n,en,d,g,m,f,e,note,cp}]
 //   items   = 「内容管理-道具技能」全量（同上结构，构建阶段标 src='item'）
 //   heroes  = 「内容管理-英雄数据」全量 [{i,zh,en,a,s}]
+//   itemRefs = 现版本物品技能 id（道具数据 item/list 里「有分类（cate1 非空且非已移除/未发布）」道具的 ability_map）
 //
 // 注意：本文件被 scripts/build_bookmarklet.py 压成单行后内联进 index.html，
 //       所以这里只用「整行 // 注释」，不要用行尾注释（压缩脚本只删整行注释）。
@@ -82,7 +83,8 @@
       f: feat,
       e: eff,
       note: String(x.skill_notes == null ? '' : x.skill_notes),
-      cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim()
+      cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim(),
+      ut: parseInt(x.update_time, 10) || 0
     };
   }
   function getJSON(url, opt) {
@@ -137,6 +139,38 @@
       if (L3.length < 100) break;
     }
 
+    // ---------- 2c) 现版本物品技能（道具数据 item/list 的 ability_map）----------
+    // 只算「有分类」道具：item/list 的 cate1 非空，且不是「已移除物品」「未发布物品」
+    // （2026-11-06 用户定口径）。分类为空的也不计入。
+    var itemRefs = [], itemDataCount = 0;
+    try {
+      var refSet = {};
+      for (var p4 = 1; p4 <= 12; p4++) {
+        step('道具数据第 ' + p4 + ' 页…（现版本技能引用 ' + Object.keys(refSet).length + '）');
+        var j4 = await getJSON('/apg/admin/item/list?page=' + p4 + '&page_size=100');
+        var L4 = (j4.data && j4.data.list) || [];
+        if (!L4.length) break;
+        itemDataCount += L4.length;
+        L4.forEach(function (it) {
+          var c1 = String(it.cate1 == null ? '' : it.cate1).trim();
+          if (!c1) return;
+          if (c1 === '已移除物品' || c1 === '未发布物品') return;
+          var am = it.ability_map;
+          if (Array.isArray(am)) {
+            am.forEach(function (x) { var n = parseInt(x, 10); if (n > 0) refSet[n] = 1; });
+          } else {
+            String(am == null ? '' : am).split(',').forEach(function (s) {
+              var n = parseInt(s.trim(), 10); if (n > 0) refSet[n] = 1;
+            });
+          }
+        });
+        if (L4.length < 100) break;
+      }
+      itemRefs = Object.keys(refSet).map(function (k) { return parseInt(k, 10); }).sort(function (a, b) { return a - b; });
+    } catch (e) {
+      itemRefs = [];
+    }
+
     // ---------- 3) 英雄名册（技能归属只认 ability_map）----------
     var heroes = [];
     try {
@@ -165,6 +199,9 @@
 
     // ---------- 4) 下载 _raw.json ----------
     step('生成文件…');
+    // 非英雄单位技能代码名：构建书签时由 scripts/build_bookmarklet.py 从
+    // ../编写规范/非英雄单位技能.md 注入（占位 __CREEP_REFS__ 会被替换成字符串数组）
+    var creepRefs = __CREEP_REFS__;
     var payload = {
       ok: true,
       fetchedAt: new Date().toISOString(),
@@ -172,12 +209,16 @@
       abilityCount: abs.length,
       itemCount: items.length,
       heroCount: heroes.length,
+      itemDataCount: itemDataCount,
+      itemRefCount: itemRefs.length,
       pages: pages,
       itemPages: ipages,
       tags: tags,
       abilities: abs,
       items: items,
-      heroes: heroes
+      heroes: heroes,
+      itemRefs: itemRefs,
+      creepRefs: creepRefs
     };
     var txt = JSON.stringify(payload);
     var sizeKB = Math.round(txt.length / 1024);

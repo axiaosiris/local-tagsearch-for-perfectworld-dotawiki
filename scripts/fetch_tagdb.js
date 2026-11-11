@@ -1,6 +1,9 @@
 // fetch_tagdb —— 抓取「Tag管理」全量标签 + 「技能」全量 tag 数据（供离线检索工具 tagsearch 使用）
 // 入参：无（A.compact=1 精简输出，默认 1）
-// 输出：{ ok, fetchedAt, tags:[{id,name,c1,c2}], abilities:[{i,n,en,d,g,m,f,e,cp}], items:[同上], heroes:[{i,zh,en,a,s}] }
+// 输出：{ ok, fetchedAt, tags:[{id,name,c1,c2}], abilities:[…], items:[…], heroes:[…], itemRefs:[id…] }
+//   itemRefs = 现版本物品技能 id 列表：道具数据 item/list 里「有分类（cate1 非空且非已移除/未发布）」道具的
+//    ability_map 引用的技能 id（2026-11-06 用户定口径，取代 11-04 的「非已移除/未发布」口径）；
+//    抓不到则为空数组（检索器退回旧行为）。
 //   abilities = 「技能」（英雄技能）全量；items = 「内容管理-道具技能」全量，字段与 abilities 完全一致，
 //    构建阶段给 items 写 src='item'（abilities 不写 src，缺省即 'hero'）。
 //   heroes = 「内容管理-英雄数据」全量英雄（接口 /apg/admin/hero/list，POST {}）
@@ -72,7 +75,9 @@
       e: eff,
       note: String(x.skill_notes == null ? '' : x.skill_notes),
       // 施法前摇（后台字段 ability_cast_point；注意 _back 后缀的是「施法后摇」）
-      cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim()
+      cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim(),
+      // 最后更新时间（秒级 unix）→ 用于「今日更新」判定：id ≥ 20000 的自定义技能若今日更新过则不按自定义排除
+      ut: parseInt(x.update_time, 10) || 0
     };
   }
 
@@ -99,6 +104,40 @@
     L3.forEach(function (x) { items.push(pack(x)); });
     if (L3.length < 100) break;
   }
+
+  // ---------- 2c) 现版本物品技能（道具数据 item/list 的 ability_map）----------
+  // 判定口径（2026-11-06 用户定）：只算「有分类」的物品——道具数据 item/list 的 `cate1`
+  // 字段非空（商店物品 / 中立物品 / 掉落 / 采集物品 / 派生物品…），且不是「已移除物品」「未发布物品」（基地商店有售 / 神秘商店有售 / 打造 / 采集 / 野怪掉落 / 肉山掉落…）。
+  // 分类为空的（组件 / 未整理条目）、已移除、未发布 → 都不算现版本。
+  // 抓取结果只输出 id 列表 itemRefs；构建阶段给对应物品技能写 cur=1。
+  // 抓不到时 itemRefs 为空 → 构建阶段不写 itemCur 标记，检索器退回「全部物品技能」旧行为。
+  var itemRefs = [], itemDataCount = 0, itemCateCount = 0;
+  try {
+    var refSet = {};
+    for (var p4 = 1; p4 <= 12; p4++) {
+      var r4 = await fetch('/apg/admin/item/list?page=' + p4 + '&page_size=100', { credentials: 'include' });
+      var j4 = await r4.json();
+      var L4 = (j4.data && j4.data.list) || [];
+      if (!L4.length) break;
+      itemDataCount += L4.length;
+      L4.forEach(function (it) {
+        var c1 = String(it.cate1 == null ? '' : it.cate1).trim();
+        if (!c1) return;                       // 无分类 → 不算现版本物品
+        if (c1 === '已移除物品' || c1 === '未发布物品') return;
+        itemCateCount++;
+        var am = it.ability_map;
+        if (Array.isArray(am)) {
+          am.forEach(function (x) { var n = parseInt(x, 10); if (n > 0) refSet[n] = 1; });
+        } else {
+          String(am == null ? '' : am).split(',').forEach(function (s) {
+            var n = parseInt(s.trim(), 10); if (n > 0) refSet[n] = 1;
+          });
+        }
+      });
+      if (L4.length < 100) break;
+    }
+    itemRefs = Object.keys(refSet).map(function (k) { return parseInt(k, 10); }).sort(function (a, b) { return a - b; });
+  } catch (e) { itemRefs = []; }
 
   // ---------- 3) 英雄全量（内容管理-英雄数据；能力清单在 ability_map） ----------
   var heroes = [];
@@ -129,11 +168,15 @@
     abilityCount: abs.length,
     itemCount: items.length,
     heroCount: heroes.length,
+    itemDataCount: itemDataCount,
+    itemCateCount: itemCateCount,
+    itemRefCount: itemRefs.length,
     pages: pages,
     itemPages: ipages,
     tags: tags,
     abilities: abs,
     items: items,
-    heroes: heroes
+    heroes: heroes,
+    itemRefs: itemRefs
   });
 })()

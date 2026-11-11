@@ -24,20 +24,24 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(!!andBox, '页面初始化：找到「且」条件组');
     ok(andBox.querySelectorAll('.rowitem').length === 1, '初始 1 行', andBox.querySelectorAll('.rowitem').length);
 
-    // ---- 技能来源默认状态（现版本英雄技能 + 物品技能勾选；目录外技能默认不勾）----
+    // ---- 技能来源默认状态（现版本英雄 / 现版本物品 / 现版本非英雄单位 勾选；目录外 / 非现版本物品默认不勾）----
     const sChips0 = Array.prototype.slice.call(doc.querySelectorAll('#srcList .schip'));
-    ok(sChips0.length === 3, '来源列表 3 类（现版本英雄技能 / 物品技能 / 目录外技能）', sChips0.length);
+    ok(sChips0.length >= 5, '来源列表至少 5 类（现版本英雄 / 现版本物品 / 现版本非英雄单位 / 目录外 / 非现版本物品）', sChips0.length);
     ok(/现版本英雄技能/.test(sChips0[0].textContent) && sChips0[0].querySelector('input').checked,
       '「现版本英雄技能」默认勾选');
-    ok(/目录外技能/.test(sChips0[2].textContent) && !sChips0[2].querySelector('input').checked,
-      '「目录外技能」默认不勾（旧版本残留不参与检索）');
-    ok(/已选 2 \/ 3 类/.test(doc.getElementById('srcSum').textContent), '来源摘要显示「已选 2 / 3 类」',
+    ok(/现版本物品技能/.test(sChips0[1].textContent) && sChips0[1].querySelector('input').checked,
+      '「现版本物品技能」默认勾选（第 2 位）');
+    ok(/现版本非英雄单位技能/.test(sChips0[2].textContent) && sChips0[2].querySelector('input').checked,
+      '「现版本非英雄单位技能」第 3 位且默认勾选');
+    ok(/目录外技能/.test(sChips0[3].textContent) && !sChips0[3].querySelector('input').checked,
+      '「目录外技能」第 4 位、默认不勾（旧版本残留不参与检索）');
+    ok(/已选 3 \/ \d+ 类/.test(doc.getElementById('srcSum').textContent), '来源摘要显示「已选 3 / N 类」',
       doc.getElementById('srcSum').textContent);
     ok(+sChips0[0].querySelector('.cnt').textContent.replace(/\D/g, '') === window.__tagsearch.info().heroedSkills,
       '「现版本英雄技能」条数 = 有 ability_map 归属的条目数',
       sChips0[0].querySelector('.cnt').textContent.trim());
     // 后续用例按「全部来源」口径跑（含目录外，等价于改造前的全库行为）
-    window.__tagsearch.setSources(['hero', 'item', 'orphan']);
+    window.__tagsearch.setSources(['hero', 'item', 'orphan', 'itemOld']);
 
     const inp = andBox.querySelector('input');
 
@@ -545,9 +549,17 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     mTag.dispatchEvent(new window.Event('click', { bubbles: true }));
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
 
-    const mu = doc.getElementById('matchUnit');
-    ok(!!mu, '左栏存在「同一效果内匹配」开关');
-    ok(mu.checked === true, '「同一效果内匹配」默认勾选');
+    const unitRadios = () => Array.prototype.slice.call(doc.querySelectorAll('input[name="unitMode"]'));
+    const unitPick = (v) => {
+      const el = unitRadios().filter((x) => x.value === v)[0];
+      if (!el) return null;
+      el.checked = true;
+      el.dispatchEvent(new window.Event('change', { bubbles: true }));
+      return el;
+    };
+    ok(unitRadios().length === 3, '左栏存在「匹配粒度」三档单选', unitRadios().length);
+    ok((unitRadios().filter((x) => x.checked)[0] || {}).value === 'effect',
+      '默认档位 =「效果类 tag 需同一效果条目」');
 
     const andRows = () => Array.prototype.slice.call(doc.querySelectorAll('.grp[data-k="and"] .rows input'));
     const setAnd = (vals) => {
@@ -575,17 +587,15 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(/效果类同一条目/.test(doc.getElementById('expr').textContent), '「当前条件」标明匹配粒度',
       doc.getElementById('expr').textContent.replace(/\s+/g, ' ').trim());
 
-    mu.checked = false;
-    mu.dispatchEvent(new window.Event('change', { bubbles: true }));
-    ok(+doc.getElementById('nHit').textContent === 2, '取消勾选 → 回到旧口径（整技能合并，2 条）',
+    unitPick('skill');
+    ok(+doc.getElementById('nHit').textContent === 2, '切到「整条技能合并」→ 旧口径 2 条',
       doc.getElementById('nHit').textContent);
-    ok(doc.querySelectorAll('#tblbox .chip.unit').length === 0, '旧口径不显示命中单元');
+    ok(doc.querySelectorAll('#tblbox .chip.unit').length === 0, '「整条技能合并」不显示命中单元');
     ok(/整技能合并/.test(doc.getElementById('expr').textContent), '表达式切换为「整技能合并」',
       doc.getElementById('expr').textContent.replace(/\s+/g, ' ').trim());
 
-    mu.checked = true;
-    mu.dispatchEvent(new window.Event('change', { bubbles: true }));
-    ok(+doc.getElementById('nHit').textContent === 1, '重新勾选 → 恢复同一效果内（1 条）',
+    unitPick('effect');
+    ok(+doc.getElementById('nHit').textContent === 1, '切回「效果类同条目」→ 1 条',
       doc.getElementById('nHit').textContent);
 
     // 反选也在同一效果内判断：同效果技能的「效果甲」里就有 B → 被剔除；跨效果技能仍命中
@@ -602,7 +612,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
     doc.querySelector('.grp[data-k="not"] .rows .del') &&
       doc.querySelectorAll('.grp[data-k="not"] .rows .del').forEach((b) => b.dispatchEvent(new window.Event('click', { bubbles: true })));
-    mu.checked = true;
+    unitPick('effect');
 
     // 技能级 tag（类型 / 特性类）可以跨效果：点目标 + 眩晕 不再要求落在同一条效果
     setAnd(['测试点目标', '测试眩晕']);
@@ -613,7 +623,56 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(/技能类型/.test(doc.getElementById('tblbox').textContent),
       '结果里标出技能级 tag 的命中位置（技能类型）');
 
-    // ================= 技能筛选（按数据来源；英雄技能 + 物品技能） =================
+    // ================= 新档位：所有 tag 需同一效果条目（unitMode='all'） =================
+    window.__tagsearch.applyDb({
+      fetchedAt: '2026-11-09T00:00:00.000Z',
+      tags: [
+        { id: 601, name: '测试弱驱散', c1: '机制', c2: '包含效果' },
+        { id: 602, name: '测试眩晕', c1: '机制', c2: '包含效果' },
+        { id: 603, name: '测试点目标', c1: '机制', c2: '施法类型' },
+        { id: 604, name: '测试单一目标', c1: '目标', c2: '目标' },
+        { id: 605, name: '测试基础技能', c1: '机制', c2: '技能类别' }
+      ],
+      notePool: [],
+      abilities: [
+        { i: 9601, n: '目标同行技能', en: 'target_same', d: [603, 605], g: [], m: [],
+          e: [{ n: '效果甲', t: [601, 604] }] },
+        { i: 9602, n: '目标分家技能', en: 'target_split', d: [603, 605], g: [], m: [],
+          e: [{ n: '效果甲', t: [601] }, { n: '效果乙', t: [604] }] }
+      ]
+    }, '合成测试数据（全部 tag 同一效果条目）');
+    mTag.dispatchEvent(new window.Event('click', { bubbles: true }));
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    unitPick('effect');
+    setAnd(['测试弱驱散', '测试单一目标']);
+    ok(+doc.getElementById('nHit').textContent === 2,
+      '效果类档：目标类 tag 不参与同行判定，2 条都命中', doc.getElementById('nHit').textContent);
+
+    unitPick('all');
+    ok(+doc.getElementById('nHit').textContent === 1 &&
+       /目标同行技能/.test(doc.getElementById('tblbox').textContent),
+      '所有 tag 档：目标 tag 必须与效果类 tag 落在同一条效果里（只命中同行那条）',
+      doc.getElementById('nHit').textContent);
+    ok(/所有 tag 同一效果条目/.test(doc.getElementById('tblbox').textContent),
+      '结果区说明按新档位措辞');
+    ok(/全部tag同一条目/.test(doc.getElementById('expr').textContent.replace(/\s+/g, '')),
+      '表达式标明「全部tag同一条目」', doc.getElementById('expr').textContent.replace(/\s+/g, ' ').trim());
+
+    // 「技能类别」在黑名单里：即使最严档位也不参与同行判定
+    setAnd(['测试基础技能', '测试弱驱散']);
+    ok(+doc.getElementById('nHit').textContent === 2,
+      '技能级类别（技能类别/施法类型…）在最严档位也不参与同行判定，2 条都命中',
+      doc.getElementById('nHit').textContent);
+
+    // 施法类型同样不参与（点目标挂在技能类型区）
+    setAnd(['测试点目标', '测试单一目标']);
+    ok(+doc.getElementById('nHit').textContent === 2,
+      '施法类型同样按技能级处理（不受同行限制）', doc.getElementById('nHit').textContent);
+    unitPick('effect');
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+    // ================= 技能筛选（按数据来源；现版本英雄 / 现版本物品 / 目录外 / 非现版本物品） =================
     const srcDb = {
       fetchedAt: '2026-10-26T00:00:00.000Z',
       tags: [{ id: 488, name: '治疗', c1: '机制', c2: '包含效果' }],
@@ -637,7 +696,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(!!doc.getElementById('paneSrc'), '左栏存在「技能筛选」卡片');
     ok(!doc.getElementById('paneHero') && !doc.getElementById('heroGrid'),
       '原「英雄筛选」卡片与英雄网格已移除');
-    ok(sChips().length === 3, '只列出已接入的来源（3 类：现版本英雄技能 + 物品技能 + 目录外技能）', sChips().length);
+    ok(sChips().length === 5, '只列出已接入的来源（5 类：现版本英雄 / 现版本物品 / 目录外 / 非现版本物品 / 非英雄单位）', sChips().length);
     ok(/现版本英雄技能/.test(sChips()[0].textContent), '来源选项为「现版本英雄技能」',
       sChips()[0].textContent.trim());
     ok(sChips()[0].querySelector('input').checked, '「现版本英雄技能」默认勾选');
@@ -676,7 +735,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
         { i: 9403, n: '物品一', en: 'item_one', src: 'item', d: [488], g: [], m: [], e: [], nt: [0] }
       ])
     }, '含物品技能');
-    ok(sChips().length === 3, '数据变化后来源勾选项仍为已接入的 3 类', sChips().length);
+    ok(sChips().length === 5, '数据变化后来源勾选项仍为已接入的 5 类', sChips().length);
     const itemCb = srcCb(/物品技能/);
     ok(!!itemCb && !itemCb.checked, '手动取消过的来源，换数据后仍保持未勾选（选择状态沿用）');
     ok(/已选 1 \/ 2 类/.test(doc.getElementById('srcSum').textContent), '摘要反映「已选 1 / 2 类」',
@@ -720,6 +779,33 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(/目录外技能/.test(tblText()), '结果行标出技能来源「目录外技能」');
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
 
+    // ================= 现版本物品技能：默认只勾现版本，非现版本单独可选 =================
+    window.__tagsearch.applyDb({
+      fetchedAt: '2026-11-04T00:00:00.000Z',
+      tags: [{ id: 488, name: '治疗', c1: '机制', c2: '包含效果' }],
+      notePool: [],
+      itemCur: true,
+      abilities: [
+        { i: 9701, n: '现版本物品一', en: 'cur_item', src: 'item', cur: 1, d: [488], g: [], m: [], e: [] },
+        { i: 9702, n: '非现版本物品一', en: 'old_item', src: 'item', d: [488], g: [], m: [], e: [] }
+      ]
+    }, '合成测试数据（现版本物品技能）');
+    const curCb = srcCb(/现版本物品技能/);
+    const oldCb = srcCb(/非现版本物品技能/);
+    ok(!!curCb && !!oldCb, '左栏出现「现版本物品技能」「非现版本物品技能」两个开关');
+    ok(/1 条/.test(curCb.closest('.schip').textContent) && /1 条/.test(oldCb.closest('.schip').textContent),
+      '两类物品技能各 1 条', curCb.closest('.schip').textContent + ' / ' + oldCb.closest('.schip').textContent);
+    window.__tagsearch.setSources(['item']);
+    setAnd(['治疗']);
+    ok(+doc.getElementById('nHit').textContent === 1 && /现版本物品一/.test(tblText()) && !/非现版本物品一/.test(tblText()),
+      '默认「现版本物品技能」口径不含非现版本条目',
+      doc.getElementById('nHit').textContent + ' / ' + (/非现版本物品一/.test(tblText()) ? '混入' : '干净'));
+    window.__tagsearch.setSources(['itemOld']);
+    ok(+doc.getElementById('nHit').textContent === 1 && /非现版本物品一/.test(tblText()),
+      '改勾「非现版本物品技能」后才出现该条目', doc.getElementById('nHit').textContent);
+    window.__tagsearch.setSources(['hero', 'item', 'orphan', 'itemOld']);
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+
     // ================= 同名 tag：按类别区分 =================
     window.__tagsearch.applyDb({
       fetchedAt: '2026-10-30T00:00:00.000Z',
@@ -734,7 +820,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
       ]
     }, '合成测试数据（同名 tag）');
     // 上一段测试把来源改成「只物品」，这里恢复全选，否则新数据（hero）会被筛掉
-    window.__tagsearch.setSources(['hero', 'item', 'orphan']);
+    window.__tagsearch.setSources(['hero', 'item', 'orphan', 'itemOld']);
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
 
     // 补全里同名 tag 应拆成「名称（类别）」

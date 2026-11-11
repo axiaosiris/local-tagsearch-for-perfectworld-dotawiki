@@ -15,6 +15,7 @@
 ⚠️ 因为只删整行注释，源码里不要写行尾注释（如 `var x = 1; // 说明`），否则会被原样保留。
 ⚠️ 改完书签源码后必须重跑本脚本，否则 index.html 里的仍是旧代码。
 """
+import json
 import os
 import re
 import sys
@@ -31,11 +32,26 @@ END = '<!-- BKMK_END -->'
 if not os.path.exists(SRC):
     sys.exit('缺少源文件：%s' % SRC)
 
+# ---------------------------------------------------------------- 0) 注入非英雄单位技能代码名
+# 书签源里有一处占位 `__CREEP_REFS__`，构建时替换成《编写规范/非英雄单位技能.md》的代码名数组。
+# 这样浏览器里抓出来的 _raw.json 自带 creepRefs，页面内置的 buildDbFromRaw 才能标出「非英雄单位技能」。
+CREEP_MD = os.environ.get('CREEP_MD') or os.path.join(ROOT, '..', '编写规范', '非英雄单位技能.md')
+creep_codes = []
+if os.path.isfile(CREEP_MD):
+    with open(CREEP_MD, 'r', encoding='utf-8') as f:
+        for line in f:
+            m = re.match(r'^\|\s*([^|]+?)\s*\|\s*`([^`]+)`\s*\|', line.strip())
+            if m:
+                creep_codes.append(m.group(2))
+    print('非英雄单位技能表：%s（%d 条）' % (os.path.normpath(CREEP_MD), len(creep_codes)))
+else:
+    print('⚠️ 未找到非英雄单位技能表（%s）→ creepRefs 注入为空数组' % os.path.normpath(CREEP_MD))
+
 # ---------------------------------------------------------------- 1) 压缩
 lines = []
 with open(SRC, 'r', encoding='utf-8') as f:
     for raw in f:
-        s = raw.strip()
+        s = raw.replace('__CREEP_REFS__', json.dumps(creep_codes, ensure_ascii=False, separators=(',', ':'))).strip()
         if not s:
             continue
         if s.startswith('//'):

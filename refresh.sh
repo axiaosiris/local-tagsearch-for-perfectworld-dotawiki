@@ -69,4 +69,10 @@ fi
 cd "$DIR" || exit 1
 PYTHON="${PYTHON:-python}"
 "$PYTHON" build_data.py || exit 1
+
+# 7) 重建「抓取书签」并内联 index.html
+#    书签里的 creepRefs 由《编写规范/非英雄单位技能.md》注入，留档表一加新条目就必须重建，
+#    否则用书签抓出来的 _raw.json 会把新增的非英雄单位技能误标成英雄技能。
+"$PYTHON" scripts/build_bookmarklet.py || exit 1
+
 echo "完成 —— 刷新 index.html 即可看到最新数据。"

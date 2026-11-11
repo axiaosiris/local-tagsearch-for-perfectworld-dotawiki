@@ -8,14 +8,14 @@
  *   and: [tagName…] 必须全部包含（且）
  *   or : [tagName…] 至少包含其一（或）——为空则不参与判断
  *   not: [tagName…] 全部不得包含（反选/排除）
- *   matchUnit: 匹配粒度（默认 true）——分两类 tag 判定：
- *        ①「效果类」tag（tag 管理里 机制-包含效果 及其同级效果组：包含效果/状态效果/
- *          驱散情况/减益免疫/叠加方式/伤害类型…）→ 必须**落在同一个效果条目里**；
- *          例：且=[弱驱散, 眩晕] 只命中「某个效果里同时有这两个 tag」的技能，
- *          「效果2有弱驱散、效果1有眩晕」不再算命中（或 / 反选同理）。
- *        ②「技能级」tag（技能类型 / 技能特性的类别：点目标、主动、会被破坏…）→
- *          可以跨效果、跨类型、跨特性，在整个技能里满足即可。
- *        false = 旧口径（整技能的 tag 并集判断）。
+ *   unitMode: 匹配粒度（三档，默认 'effect'）——决定「多个 tag 在多大范围里同时成立」：
+ *        'skill'  整条技能合并：类型 ∪ 特性 ∪ tags 字段 ∪ 所有效果行，任意位置满足即可（最宽松）
+ *        'effect' 效果类 tag 需同一效果条目（默认）：只有「效果类」tag 必须落在同一个效果行里，
+ *                 技能级 tag 仍可跨效果/类型/特性；例：且=[弱驱散, 眩晕] 只命中
+ *                 「某个效果里同时有这两个 tag」的技能，「效果2有弱驱散、效果1有眩晕」不算命中
+ *        'all'    所有 tag 需同一效果条目：除 SKILL_C2 里登记的「技能级类别」外，其余类别
+ *                 （含 目标 / 包含效果 / 状态效果 / 驱散情况 / 伤害类型…）都必须落在同一条效果里
+ *        （旧的 query.matchUnit:false 仍兼容，等价于 'skill'）
  *   scope: {d:技能类型, e:技能效果, m:技能特性, g:tags字段}
  *   includeExcluded: 是否把「废弃/自定义/公式残条」条目也纳入检索（默认 false，即排除）
  *   cast: {min, max} 施法前摇闭区间（秒，null=该侧不限）——与 tag 条件**同时生效**，
@@ -27,9 +27,12 @@
  *         不做英文名推断；技能总表里残留的旧版本技能/废弃天赋登记不到任何英雄，
  *         启用英雄筛选时不会被命中（统计在 stats.hero.out）。
  *   sources: [来源 key…] 技能来源筛选（数据类别，见下方 SOURCES 登记表）——只保留所选来源的
- *         技能（并集）。判定见 srcOf：写了 a.src 的按 src（物品技能 = 'item'）；没写 src 的
+ *         技能（并集）。判定见 srcOf：写了 a.src 的按 src（物品技能 = 'item'，非英雄单位技能 = 'creep'；
+ *         数据包带 itemCur 标记时再按 a.cur 拆成 item 现版本 / itemOld 非现版本）；没写 src 的
  *         英雄技能条目按 a.h（ability_map 归属）分为 'hero'（有归属 = 现版本英雄技能）与
  *         'orphan'（无归属 = 目录外：旧版本残留 / 废弃天赋 / 通用条目）。
+ *         默认勾选 hero（现版本英雄技能）+ item（现版本物品技能）+ creep（现版本非英雄单位技能）；
+ *         orphan / itemOld 默认不勾。
  *         未勾选任何来源 = 不过滤（界面会拦住）；只勾了部分来源时统计在 stats.src.out。
  * 同名 tag 可能存在于多个档位（如「友方防御塔」有 目标/神杖/魔晶/天赋 四档）→ 命中任一档即算包含。
  * 技能特性（skill_mechanism）除词条外还有「特性内容」（mechanism_input）：
@@ -52,7 +55,7 @@
   var CUSTOM_ID_MIN = 20000;
   var EXCLUDE_KINDS = [
     { key: 'noUse', label: '废弃条目', tip: '名称带「（废）」标记' },
-    { key: 'custom', label: '自定义技能', tip: 'id ≥ ' + CUSTOM_ID_MIN },
+    { key: 'custom', label: '自定义技能', tip: 'id ≥ ' + CUSTOM_ID_MIN + '（本次抓取日更新过的除外）' },
     { key: 'junk', label: '公式残条', tip: '名称以「-{」开头' }
   ];
 
@@ -64,36 +67,54 @@
     // 不能只看含「废」字：物品技能里有正常的「残废」，会被误判成废弃条目
     if (/[（(]废/.test(n)) return 'noUse';
     if (n.indexOf('-{') === 0) return 'junk';
-    if (a.i >= CUSTOM_ID_MIN) return 'custom';
+    if (a.i >= CUSTOM_ID_MIN) {
+      // 例外（2026-11-10 用户定）：**本次抓取日更新过**的条目不算自定义技能排除，
+      // 即使没勾「包含被排除项」也照常参与检索 —— 后台刚新建/刚改过的技能（如建筑机制条）
+      // 会立刻带 id ≥ 20000 落进来，若不豁免就要等人工勾选才能搜到。
+      // 构建阶段（build_data.py / 页面 buildDbFromRaw）按 update_time 与 fetchedAt 同日算出 nx=1。
+      if (a.nx) return null;
+      return 'custom';
+    }
     return null;
   }
 
   /* ---------- 技能来源（数据类别）----------
-   * 检索库今后不只有英雄技能：物品技能、非英雄单位技能等会陆续并入同一份数据。
+   * 检索库不只有英雄技能：物品技能、非英雄单位技能并入同一份数据。
    * 判定顺序（见 srcOf）：
-   *   ① 技能对象写了 src（物品技能 = 'item'，今后接入的来源照此写）→ 就用它；
+   *   ① 技能对象写了 src → 就用它（物品技能 = 'item'，非英雄单位技能 = 'creep'）；
    *   ② 没写 src 的英雄技能条目，看 a.h（ability_map 归属）分两类：
-   *        有归属 → 'hero'   现版本英雄技能（与《英雄技能目录》同口径）
+   *        有归属 → 'hero'   现版本英雄技能（英雄数据页「人工处理数据 → 技能」）
    *        无归属 → 'orphan' 目录外技能（技能总表里残留的旧版本技能 / 废弃天赋 / 通用条目）
    * 新增一类来源只需两步：① 在本登记表加一行、ready 改 true（界面按此表自动渲染勾选项）；
    * ② 构建阶段给该来源的技能写 src（build_data.py）。
-   * ready:false 只是占位不显示；def:false = 界面默认不勾（目录外数据默认不参与检索）。 */
+   * ready:false 只是占位不显示；def:false = 界面默认不勾（目录外 / 非现版本物品默认不参与检索）。
+   * 顺序即界面显示顺序（2026-11-06：非英雄单位技能上移至第 3 位、改名「现版本非英雄单位技能」并改为默认勾选）。 */
   var SOURCES = [
     { key: 'hero', label: '现版本英雄技能', ready: true,
       tip: '后台「英雄数据 → 人工处理数据 → 技能」里登记在某个英雄名下的现版本技能（与 编写规范/英雄技能目录.md 同口径）' },
-    { key: 'item', label: '物品技能', ready: true,
-      tip: '道具附带的技能（后台「内容管理 → 道具技能」），与英雄技能共用同一套标签；无英雄归属' },
+    { key: 'item', label: '现版本物品技能', ready: true,
+      tip: '被「有分类」道具（道具数据 item/list 的 cate1 非空，且不是已移除 / 未发布）引用的技能；数据无 itemCur 标记时等于全部物品技能' },
+    { key: 'creep', label: '现版本非英雄单位技能', ready: true,
+      tip: '野怪 / 小兵 / 召唤物 / Boss 的技能——以本地《编写规范/非英雄单位技能.md》为准，代码名命中该表即归此类' },
     { key: 'orphan', label: '目录外技能', ready: true, def: false,
-      tip: '技能总表里没有登记到任何英雄的条目：旧版本残留、废弃天赋、通用/测试条目——不属于现版本英雄技能（默认不勾）' },
-    { key: 'creep', label: '非英雄单位技能', ready: false,
-      tip: '野怪 / 小兵 / 召唤物 / Boss 的技能——数据尚未接入' }
+      tip: '技能总表里既没登记到任何英雄、也不在非英雄单位技能表里的条目：旧版本残留、废弃天赋、通用/测试条目（默认不勾）' },
+    { key: 'itemOld', label: '非现版本物品技能', ready: true, def: false,
+      tip: '道具技能页里未被任何有分类道具引用的条目：无分类 / 已移除 / 未发布物品的技能、审核拒绝技能（默认不勾）' }
   ];
   var SRC_DEFAULT = 'hero';
 
-  /** 某技能的来源 key：写了 src 就用它；否则按英雄归属分为 hero（已登记）/ orphan（目录外） */
+  /* 数据包是否带「现版本物品技能」标记（db.itemCur）。
+   * createIndex 时刷新；旧 data.js 没有该标记 → 全部物品技能都算 'item'，保持旧行为。 */
+  var ITEM_CUR_MODE = false;
+
+  /** 某技能的来源 key：写了 src 就用它（物品技能按 cur 再分现版本/非现版本）；
+   *  否则按英雄归属分为 hero（已登记）/ orphan（目录外）。 */
   function srcOf(a) {
     var s = String((a && a.src) || '');
-    if (s && s !== SRC_DEFAULT) return s;
+    if (s && s !== SRC_DEFAULT) {
+      if (s === 'item' && ITEM_CUR_MODE) return (a && a.cur) ? 'item' : 'itemOld';
+      return s;
+    }
     return (a && a.h && a.h.length) ? 'hero' : 'orphan';
   }
 
@@ -171,6 +192,7 @@
   }
 
   function createIndex(db) {
+    ITEM_CUR_MODE = !!(db && db.itemCur);
     var id2tag = new Map();
     var name2ids = new Map();
     var name2groups = new Map();     // name → [{cat, ids, variants:[{v,id}]}]，按首次出现顺序
@@ -449,23 +471,27 @@
     return s;
   }
 
-  /* ---------- 匹配粒度：效果类 tag 必须落在「同一个效果条目」----------
+  /* ---------- 匹配粒度：tag 条件在哪个范围里同时成立 ----------
    * 一个技能的 tag 分放在几处，性质不同：
    *   技能类型 d / 技能特性 m —— 技能级属性（点目标、主动、会被破坏…），整条技能成立
    *   tags 字段 g            —— 汇总，混进效果里会把不同效果的 tag 串起来，不参与效果条目判定
    *   技能效果 e 的每一行     —— 这才是「一个效果条目」
    *
-   * 「效果类 tag」= 只描述某个效果本身的类别（见 EFFECT_C2，即 tag 管理里
-   *   「机制-包含效果」及其同级效果组下的词条：包含效果/状态效果/驱散情况/减益免疫/
-   *   叠加方式/伤害类型/伤害性质/状态抗性/减速抗性/无敌隐藏/伤害标记/初始伤害/判定时机/
-   *   生效从属/伤害间隔/状态来源/状态归属/升级来源）。
-   * 其余类别（施法类型/技能类别/冷却类型/魔法消耗/生命消耗/加成属性/目标/技能行为/
-   *   施放技能时/面对控制时/指向性技能施法时/攻击命中判定）属技能级 tag。
+   * 三档粒度（query.unitMode）：
+   *   'skill'  整条技能合并 —— 不按效果行拆分（旧行为）
+   *   'effect' 效果类 tag 需同一效果条目（默认）—— 只看 EFFECT_C2 白名单里的类别
+   *   'all'    所有 tag 需同一效果条目 —— 除 SKILL_C2 黑名单外的所有类别都要挤进同一条效果
    *
-   * 判定规则：
-   *   效果类 且/或/非 —— 必须在**同一个效果条目**里成立（不能「效果2 有 A、效果1 有 B」）
-   *   技能级 且/或/非 —— 整个技能（类型 ∪ 特性 ∪ tags 字段 ∪ 所有效果）里成立即可
-   * 同一条条件里若混了两类 tag（极少见）→ 按技能级处理（宽松）。
+   * 「效果类 tag」（EFFECT_C2）= tag 管理里「机制-包含效果」及其同级效果组下的词条：
+   *   包含效果/状态效果/驱散情况/减益免疫/叠加方式/伤害类型/伤害性质/状态抗性/减速抗性/
+   *   无敌隐藏/伤害标记/初始伤害/判定时机/生效从属/伤害间隔/状态来源/状态归属/升级来源。
+   *
+   * 「技能级类别」（SKILL_C2，2026-11-09 新增）= 不描述某个效果、只描述技能本身的类别，
+   *   即使选 'all' 也不参与「同一效果条目」判定。实测依据（2026-11-09 数据）：
+   *     技能行为 111 个全部挂 m（特性）、施法类型 80 个 99% 挂 d、技能类别 13 个全挂 d、
+   *     冷却类型 45 个挂 d、魔法消耗/生命消耗 挂 d、攻击命中判定 12 个全挂 g（tags 字段）、
+   *     施放技能时/面对控制时/指向性技能施法时 全挂 m、加成属性 未使用。
+   *   若强行纳入（只排除 技能行为/施法类型）：且=[基础技能,眩晕] 会从 89 条直接归零。
    */
   var EFFECT_C2 = {
     '包含效果': 1, '状态效果': 1, '驱散情况': 1, '减益免疫': 1, '叠加方式': 1,
@@ -473,24 +499,43 @@
     '伤害标记': 1, '初始伤害': 1, '判定时机': 1, '生效从属': 1, '伤害间隔': 1,
     '状态来源': 1, '状态归属': 1, '升级来源': 1
   };
+  var SKILL_C2 = {
+    '技能行为': 1, '施法类型': 1, '技能类别': 1, '冷却类型': 1,
+    '魔法消耗': 1, '生命消耗': 1, '攻击命中判定': 1,
+    '施放技能时': 1, '面对控制时': 1, '指向性技能施法时': 1, '加成属性': 1
+  };
+  var UNIT_MODES = ['skill', 'effect', 'all'];
 
-  /** 该 tag 是否「效果类」（决定它要不要跟别的效果类 tag 挤在同一个效果条目里） */
-  function isEffectTag(index, id) {
-    var t = index && index.id2tag ? index.id2tag.get(id) : null;
-    return !!(t && EFFECT_C2[t.c2]);
+  /** 归一化匹配粒度：'skill' 整条技能 / 'effect' 效果类同条目（默认）/ 'all' 全部 tag 同条目 */
+  function normUnitMode(q) {
+    var m = q && q.unitMode;
+    if (UNIT_MODES.indexOf(m) >= 0) return m;
+    return (q && q.matchUnit === false) ? 'skill' : 'effect';   // 兼容旧参数 matchUnit
   }
 
-  /** 一条条件（已解析出 ids）是否按「同一效果条目」判定：全部 id 都是效果类才算 */
-  function isEffectCond(index, ids) {
+  /** 该 tag 是否参与「同一效果条目」判定：mode='all' 时除技能级类别外全部参与；
+   *  mode 缺省/'effect' 时只认 EFFECT_C2 白名单。类别按 catBase 归一，
+   *  所以「神杖升级目标」「魔晶升级施法类型」等升级变体与基础类别同判。 */
+  function isEffectTag(index, id, mode) {
+    var t = index && index.id2tag ? index.id2tag.get(id) : null;
+    if (!t) return false;
+    var b = catBase(t.c2);
+    if (mode === 'all') return !SKILL_C2[b];
+    return !!EFFECT_C2[b];
+  }
+
+  /** 一条条件（已解析出 ids）是否按「同一效果条目」判定：全部 id 都必须参与才算 */
+  function isEffectCond(index, ids, mode) {
     if (!ids || !ids.length) return false;
-    for (var i = 0; i < ids.length; i++) { if (!isEffectTag(index, ids[i])) return false; }
+    for (var i = 0; i < ids.length; i++) { if (!isEffectTag(index, ids[i], mode)) return false; }
     return true;
   }
 
   /** 技能的效果条目（判定单元）：每个效果行的 tag 集合。
    *  tags 字段里那些「任何行都没有」的效果类残留 tag 视为技能级补充，挂到每行；
-   *  技能一行效果都没有（天赋加成、纯被动条目等）→ 整条技能算一个单元。 */
-  function effectRowsOf(a, scope, index) {
+   *  技能一行效果都没有（天赋加成、纯被动条目等）→ 整条技能算一个单元。
+   *  mode: 'effect'（默认，按 EFFECT_C2）/ 'all'（除 SKILL_C2 外全部参与） */
+  function effectRowsOf(a, scope, index, mode) {
     scope = normalizeScope(scope);
     var rows = [], inRows = new Set();
     if (scope.e) {
@@ -507,7 +552,7 @@
     var residual = [];
     if (scope.g && index) {
       (a.g || []).forEach(function (x) {
-        if (!inRows.has(x) && isEffectTag(index, x)) residual.push(x);
+        if (!inRows.has(x) && isEffectTag(index, x, mode)) residual.push(x);
       });
     }
     rows.forEach(function (r) {
@@ -783,18 +828,18 @@
     var notOut = 0;          // 被「反选」条件排除的技能条数（供界面说明「剩下」的算式）
     var unitOut = 0;         // 效果类条件分散在不同效果条目 → 未命中（仅统计）
     var afterTag = 0;        // 通过全部 tag 条件（含反选）、进入前摇判定的条数
-    // 匹配粒度：默认「效果类 tag 必须落在同一个效果条目」；false = 旧口径（整技能并集）
-    var matchUnit = query.matchUnit !== false;
+    // 匹配粒度：三档（'skill' 整条技能 / 'effect' 效果类同条目 / 'all' 全部 tag 同条目）
+    var unitMode = normUnitMode(query);
     // 只有反选（没有且/或）时没有可锚定的效果条目 → 按整个技能判定
     var pureNot = !andIds.length && !orIds.length;
-    var useRows = matchUnit && !pureNot && scope.e;
+    var useRows = unitMode !== 'skill' && !pureNot && scope.e;
 
     // 条件分流：效果类（同一效果条目内成立）vs 技能级（整条技能成立即可）
     var effAnd = [], genAnd = [], effOr = [], genOr = [], effNot = [], genNot = [];
     var splitConds = function (resolved, effArr, genArr) {
       resolved.forEach(function (r) {
         if (!r || !r.ids) { genArr.push(null); return; }        // 名称没解析出来：忽略该条（旧行为）
-        if (useRows && isEffectCond(index, r.ids)) effArr.push(r.ids);
+        if (useRows && isEffectCond(index, r.ids, unitMode)) effArr.push(r.ids);
         else genArr.push(r.ids);
       });
     };
@@ -813,7 +858,7 @@
       // 技能级条件：整条技能（类型 ∪ 特性 ∪ tags ∪ 所有效果）满足即可
       var genOk = matchCand(whole, genAnd, genOr, genNot);
       // 效果类条件：必须落在同一个效果条目里
-      var rows = (useRows && hasEffCond) ? effectRowsOf(a, scope, index) : null;
+      var rows = (useRows && hasEffCond) ? effectRowsOf(a, scope, index, unitMode) : null;
       var matchedRows = rows
         ? rows.filter(function (r) { return matchCand(r.set, effAnd, effOr, effNot); })
         : [];
@@ -836,7 +881,7 @@
       var detail = [];
       var pushDetail = function (r, group) {
         if (!r || !r.ids) return;
-        if (useRows && isEffectCond(index, r.ids)) {
+        if (useRows && isEffectCond(index, r.ids, unitMode)) {
           // 效果类条件：位置落在命中的效果条目里
           if (!matchedRows.some(function (row) { return hasAny(row.set, r.ids); })) return;
           detail.push({ group: group, name: r.input, names: r.names, ids: r.ids, unit: true,
@@ -891,7 +936,8 @@
         includeExcluded: showExcluded,
         cast: { on: castOn, min: castMin, max: castMax, missing: castMissing, out: castOut },
         unit: {
-          on: useRows && hasEffCond, matchUnit: matchUnit, pureNot: pureNot, out: unitOut,
+          on: useRows && hasEffCond, matchUnit: unitMode !== 'skill', unitMode: unitMode,
+          pureNot: pureNot, out: unitOut,
           mode: useRows && hasEffCond ? 'row' : 'skill',
           // 效果类（须同一效果条目）/ 技能级（跨效果、类型、特性）条件各几条
           eff: { and: effAnd.length, or: effOr.length, not: effNot.length },
@@ -901,9 +947,9 @@
           on: notIds.length > 0, out: notOut, afterTag: afterTag, unit: useRows,
           names: rNot.map(function (r) { return r && r.input || ''; }),
           // 反选里哪些是效果类（只在命中的效果条目内排除）、哪些是技能级（出现即整条剔除）
-          effNames: rNot.filter(function (r) { return r && r.ids && useRows && isEffectCond(index, r.ids); })
+          effNames: rNot.filter(function (r) { return r && r.ids && useRows && isEffectCond(index, r.ids, unitMode); })
             .map(function (r) { return r.input; }),
-          genNames: rNot.filter(function (r) { return r && r.ids && !(useRows && isEffectCond(index, r.ids)); })
+          genNames: rNot.filter(function (r) { return r && r.ids && !(useRows && isEffectCond(index, r.ids, unitMode)); })
             .map(function (r) { return r.input; })
         },
         hero: heroStats(index, heroOn, heroIds, heroOut),
@@ -954,6 +1000,9 @@
     isEffectTag: isEffectTag,
     isEffectCond: isEffectCond,
     EFFECT_C2: EFFECT_C2,
+    SKILL_C2: SKILL_C2,
+    UNIT_MODES: UNIT_MODES,
+    normUnitMode: normUnitMode,
     matchCand: matchCand,
     describe: describe,
     resolveName: resolveName,

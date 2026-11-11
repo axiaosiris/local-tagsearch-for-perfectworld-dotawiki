@@ -198,6 +198,38 @@ ok2(idx.sourceCount.hero === idx.heroedSkills, 'hero 条数 = 有 ability_map �
   idx.sourceCount.hero);
 ok2(idx.sourceCount.hero + idx.sourceCount.orphan === idx.sourceCount.hero + noHeroAb.length,
   '无 src 条目被完整拆成 hero / orphan，无交叉、无遗漏');
+
+// 现版本物品技能（2026-11-04）：数据带 itemCur 时，物品技能按 cur 拆成 item / itemOld
+if (DB.itemCur) {
+  var curItems = realItems.filter(function (a) { return a.cur; });
+  var oldItems = realItems.filter(function (a) { return !a.cur; });
+  ok2(idx.sourceCount.item === curItems.length && idx.sourceCount.itemOld === oldItems.length,
+    'item / itemOld 条数 = 带 cur 标记 / 未带标记的物品技能（' + curItems.length + ' + ' + oldItems.length + '）',
+    idx.sourceCount.item + ' / ' + idx.sourceCount.itemOld);
+  ok2(idx.sourceCount.item + idx.sourceCount.itemOld === realItems.length,
+    '现版本 + 非现版本物品技能 = 道具技能页全量（' + realItems.length + '）');
+  var onlyCur = core.search(idx, { and: [], or: [], not: [], sources: ['item'] });
+  ok2(onlyCur.hits.every(function (h) { return h.ability && h.ability.cur; }),
+    '只勾「现版本物品技能」时命中的全部是 cur=1 条目');
+} else {
+  console.log('  ⚠ 当前 data.js 无 itemCur 标记（旧快照）→ 物品技能不拆分，保持旧行为');
+}
+// 非英雄单位技能（2026-11-06）：代码名命中本地《编写规范/非英雄单位技能.md》→ src='creep'
+if (idx.sourceCount.creep) {
+  var creepSkills = DB.abilities.filter(function (a) { return a.src === 'creep'; });
+  ok2(idx.sourceCount.creep === creepSkills.length,
+    'creep 条数 = 数据里 src=\'creep\' 的技能数（' + creepSkills.length + '）', idx.sourceCount.creep);
+  ok2(creepSkills.every(function (a) { return !a.h || !a.h.length; }),
+    'creep 技能不带英雄归属（与 ability_map 无交叉）');
+  var onlyCreep = core.search(idx, { and: [], or: [], not: [], sources: ['creep'] });
+  ok2(onlyCreep.hits.length > 0 && onlyCreep.hits.every(function (h) { return h.ability && h.ability.src === 'creep'; }),
+    '只勾「非英雄单位技能」时命中的全部是 creep 条目');
+  var nonItem = DB.abilities.filter(function (a) { return a.src !== 'item'; });
+  ok2(idx.sourceCount.hero + idx.sourceCount.orphan + idx.sourceCount.creep === nonItem.length,
+    'hero + orphan + creep = 技能总表非物品条目全量（' + nonItem.length + '）');
+} else {
+  console.log('  ⚠ 当前 data.js 无 creep 条目（_raw.json 缺 creepRefs 或本地表为空）');
+}
 // 用户 bug 复现：勾「现版本英雄技能」检索【无法行动】，结果里不许再出现目录外条目
 var rOrphanLeak = core.search(idx, { and: ['无法行动'], or: [], not: [], sources: ['hero'] });
 var leak = rOrphanLeak.hits.filter(function (h) { return !(h.heroes && h.heroes.length); });
@@ -306,6 +338,49 @@ var pcUnit = core.search(idx, { not: ['眩晕'], scope: SCOPEFULL });
 var pcUnion = core.search(idx, { not: ['眩晕'], scope: SCOPEFULL, matchUnit: false });
 console.log('  只填反选 非:眩晕 → ' + pcUnit.hits.length + ' ／ ' + pcUnion.hits.length +
   '　' + (pcUnit.hits.length === pcUnion.hits.length ? '✓ 两种口径一致（无锚点时按整技能判定）' : '✗ 不一致'));
+
+// ================= 匹配粒度档位：所有 tag 需同一效果条目（unitMode='all'） =================
+console.log('\n[匹配粒度：所有 tag 同一效果条目（all）]');
+ok2(core.search(idx, { and: ['弱驱散'], scope: SCOPEFULL, unitMode: 'skill' }).hits.length ===
+  core.search(idx, { and: ['弱驱散'], scope: SCOPEFULL, matchUnit: false }).hits.length,
+  '兼容旧参数：unitMode=skill 等价于 matchUnit:false');
+ok2(core.normUnitMode({}) === 'effect' && core.normUnitMode({ unitMode: 'all' }) === 'all' &&
+  core.normUnitMode({ matchUnit: false }) === 'skill', 'normUnitMode 归一化三档', core.normUnitMode({}));
+
+var allProbe = ['弱驱散', '敌方英雄', '基础技能', '点目标', '会被破坏'];
+allProbe.forEach(function (n) {
+  var rr = core.resolveName(idx, n, false), ids = (rr && rr.ids) || [];
+  var eff = ids.length && ids.every(function (id) { return core.isEffectTag(idx, id, 'all'); });
+  console.log('  「' + n + '」(' + ((rr && rr.names) || []).join('/') + ') → ' +
+    (eff ? '参与同条目判定' : '技能级（黑名单，不参与）'));
+});
+function idOf(n) { return (core.resolveName(idx, n, false).ids || [])[0]; }
+ok2(core.isEffectTag(idx, idOf('基础技能'), 'all') === false, '黑名单：技能类别（基础技能）在 all 档不参与');
+ok2(core.isEffectTag(idx, idOf('点目标'), 'all') === false, '黑名单：施法类型（点目标）在 all 档不参与');
+ok2(core.isEffectTag(idx, idOf('会被破坏'), 'all') === false, '黑名单：技能行为（会被破坏）在 all 档不参与');
+ok2(core.isEffectTag(idx, idOf('敌方英雄'), 'all') === true, '目标类（敌方英雄）在 all 档参与同条目判定');
+ok2(core.isEffectTag(idx, idOf('敌方英雄'), 'effect') === false, '同一个目标类 tag 在 effect 档不参与 — 两档的分水岭');
+
+[['敌方英雄', '眩晕'], ['敌方英雄', '弱驱散'], ['基础技能', '眩晕']].forEach(function (pair) {
+  var q = { and: pair, scope: SCOPEFULL };
+  var s = core.search(idx, Object.assign({ unitMode: 'skill' }, q)).hits.length;
+  var e = core.search(idx, Object.assign({ unitMode: 'effect' }, q)).hits.length;
+  var a = core.search(idx, Object.assign({ unitMode: 'all' }, q)).hits.length;
+  console.log('  且:' + pair.join('+') + ' → 整技能 ' + s + ' ／ 效果类 ' + e + ' ／ 全部 tag ' + a);
+  ok2(a <= e && e <= s, '单调：整技能 ≥ 效果类 ≥ 全部 tag', s + '/' + e + '/' + a);
+});
+
+var invCond = ['敌方英雄', '弱驱散'];
+var invWant = invCond.map(function (n) { return idx.name2ids.get(n) || []; });
+var invRes = core.search(idx, { and: invCond, scope: SCOPEFULL, unitMode: 'all' });
+var invBad = invRes.hits.filter(function (h) {
+  return !core.effectRowsOf(h.ability, SCOPEFULL, idx, 'all').some(function (c) {
+    return invWant.every(function (ids) { return ids.some(function (x) { return c.set.has(x); }); });
+  });
+});
+ok2(invBad.length === 0, '不变量：all 档每条命中都能在同一条效果里找到全部条件 tag（' + invRes.hits.length + ' 条）',
+  invBad.slice(0, 3).map(function (h) { return h.name; }).join('、'));
+console.log('  all 档「分散」统计 = ' + invRes.stats.unit.out + ' 条，unitMode = ' + invRes.stats.unit.unitMode);
 
 
 // ================= 同名 tag：按类别区分 =================

@@ -81,6 +81,14 @@ header .meta b{color:#374151;font-weight:600}
 .fuzzy{font-size:12.5px;color:var(--sub);display:flex;align-items:flex-start;gap:6px;cursor:pointer;user-select:none}
 .fuzzy input{margin-top:3px;flex:none}
 .fuzzy .fz{flex:1;min-width:0}
+.unitbox{border:1px solid var(--line);border-radius:9px;padding:10px 11px;margin-bottom:10px;background:#fcfdff;border-left:3px solid #b07d00}
+.unitbox .ttl{font-weight:650;font-size:13px;color:#5d6f85;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.unitbox .ttl .hint{font-weight:400;font-size:11.5px;color:var(--sub)}
+.unitbox label{display:flex;align-items:flex-start;gap:6px;font-size:12.5px;color:#333;
+  cursor:pointer;user-select:none;padding:2px 0;line-height:1.55}
+.unitbox label input{margin-top:4px;flex:none}
+.unitbox label b{font-weight:650}
+.unitbox label .hint{color:var(--sub);font-weight:400;font-size:11.5px}
 .sum{padding:11px 14px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:14px;
   flex-wrap:wrap;font-size:13px}
 .sum b.n{color:var(--pri);font-size:16px}
@@ -261,7 +269,7 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
 .tblbox table.noteTbl{min-width:700px;table-layout:fixed}
 .nline{word-break:break-word}
 .noteTbl td:last-child{white-space:nowrap;padding-left:4px;padding-right:6px}
-/* 技能筛选（按数据来源；目前只有英雄技能，物品/非英雄单位技能待接入） */
+/* 技能筛选（按数据来源；英雄 / 物品 / 目录外 / 非现版本物品 / 非英雄单位，登记表见 search-core.js 的 SOURCES） */
 .hdright{display:flex;align-items:center;gap:8px}
 .hdright .tip{margin:0}
 .srclist{display:flex;flex-direction:column;gap:6px}
@@ -343,9 +351,17 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
           </div>
         </div>
 
-        <label class="fuzzy"><input type="checkbox" id="matchUnit" checked> <span class="fz">效果类 tag 需同一效果条目</span></label>
+        <div class="unitbox">
+          <div class="ttl">匹配粒度 <span class="hint">多个 tag 在多大范围里同时成立</span></div>
+          <label><input type="radio" name="unitMode" value="skill">
+            <span><b>整条技能合并</b> <span class="hint">— 不限位置，最宽松</span></span></label>
+          <label><input type="radio" name="unitMode" value="effect" checked>
+            <span><b>效果类 tag 需同一效果条目</b> <span class="hint">— 包含效果 / 状态效果 / 驱散情况 / 伤害类型… 须落在同一条效果里</span></span></label>
+          <label><input type="radio" name="unitMode" value="all">
+            <span><b>所有 tag 需同一效果条目</b> <span class="hint">— 除技能行为、施法类型、技能类别、冷却类型、魔法消耗、生命消耗、攻击命中判定等技能级类别外，其余 tag 都必须落在同一条效果里</span></span></label>
+        </div>
         <label class="fuzzy"><input type="checkbox" id="fuzzy"> 模糊匹配：输入子串匹配全部同名/含该词的 tag（如「防御塔」→ 友方/敌方防御塔）</label>
-        <label class="fuzzy"><input type="checkbox" id="showEx"> <span class="fz">包含被排除项：默认不检索 <b>废弃条目</b>（名含「废」）、<b>自定义技能</b>（id ≥ 20000）、<b>公式残条</b>（名以「-{」开头）</span></label>
+        <label class="fuzzy"><input type="checkbox" id="showEx"> <span class="fz">包含被排除项：默认不检索 <b>废弃条目</b>（名含「废」）、<b>自定义技能</b>（id ≥ 20000，本次抓取日更新过的除外）、<b>公式残条</b>（名以「-{」开头）</span></label>
 
         <div class="expr" id="expr"><span class="dim">当前条件：（未设置）</span></div>
 
@@ -468,7 +484,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
 <!-- BKMK_BEGIN -->
 <!-- 抓取书签代码：由 scripts/build_bookmarklet.py 从
      scripts/fetch_tagdb.bookmarklet.js 生成，请勿手改本块 -->
-<script type="text/plain" id="bkmkSrc">(async function () { 'use strict'; var D = document; if (!/^partner\.dota2\.com\.cn$/i.test(location.hostname)) { alert('请先在已登录的 partner.dota2.com.cn 后台页面使用本抓取书签。'); return; } var box = D.getElementById('__tsbkBox'); if (!box) { box = D.createElement('div'); box.id = '__tsbkBox'; box.setAttribute('style', 'position:fixed;right:18px;bottom:18px;z-index:2147483647;width:336px;' + 'background:#101418;color:#e8eef5;border:1px solid #2c3946;border-radius:10px;padding:12px 14px;' + 'font:13px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.45)'); D.body.appendChild(box); } function paint(title, body, ok) { box.innerHTML = '<div style="font-weight:600;color:' + (ok === false ? '#ff9d9d' : ok ? '#8fe3a8' : '#cfe3ff') + ';margin-bottom:4px">' + title + '</div><div style="opacity:.85">' + body + '</div>'; } function step(t) { paint('正在抓取后台数据…', t); } step('准备中…'); function jarr(v) { if (v == null || v === '') return []; if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return []; } function ids(v) { if (v == null || v === '') return []; var out = [], arr = jarr(v); if (arr.length) { arr.forEach(function (x) { var n = parseInt(x, 10); if (!isNaN(n) && n > 0) out.push(n); }); return out; } if (typeof v === 'string') { v.split(',').forEach(function (t) { var n = parseInt(t, 10); if (!isNaN(n) && n > 0) out.push(n); }); } return out; } function pack(x) { var eff = jarr(x.skill_effect).map(function (e) { return { n: e.effect_input || '', t: ids(e.effect_tag) }; }); var mech = [], feat = []; jarr(x.skill_mechanism).forEach(function (mm) { var n = parseInt(mm.mechanism_tag, 10); if (isNaN(n) || n <= 0) return; mech.push(n); feat.push({ i: n, c: String(mm.mechanism_input == null ? '' : mm.mechanism_input) }); }); return { i: x.id, n: x.name_zh || '', en: x.name_en || '', d: ids(x.skill_detail), g: ids(x.tags), m: mech, f: feat, e: eff, note: String(x.skill_notes == null ? '' : x.skill_notes), cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim() }; } function getJSON(url, opt) { var o = opt || { credentials: 'include' }; if (!o.credentials) o.credentials = 'include'; return fetch(url, o).then(function (r) { if (r.status === 401 || r.status === 403) throw new Error('未登录或登录已过期（HTTP ' + r.status + '）'); if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + url); return r.json(); }).then(function (j) { if (j && typeof j.code === 'number' && j.code !== 0) { throw new Error('接口返回 code=' + j.code + (j.msg ? '（' + j.msg + '）' : '') + ' —— 请确认已登录后台'); } return j; }); } try { var tags = []; for (var p = 1; p <= 50; p++) { step('Tag 第 ' + p + ' 页…（已 ' + tags.length + ' 条）'); var j = await getJSON('/apg/admin/mechanism/list?page=' + p); var L = (j.data && j.data.list) || (j.data && j.data.data) || []; if (!L.length) break; L.forEach(function (t) { tags.push({ id: t.id, name: t.name, c1: t.cate1 || '', c2: t.cate2 || '', sort: t.sort, pid: t.pid }); }); } var abs = [], pages = 0; for (var p2 = 1; p2 <= 50; p2++) { step('技能第 ' + p2 + ' 页…（已 ' + abs.length + ' 条 / Tag ' + tags.length + '）'); var j2 = await getJSON('/apg/admin/hero/ability?page=' + p2); var L2 = (j2.data && j2.data.list) || []; pages = p2; if (!L2.length) break; L2.forEach(function (x) { abs.push(pack(x)); }); } var items = [], ipages = 0; for (var p3 = 1; p3 <= 30; p3++) { step('物品技能第 ' + p3 + ' 页…（已 ' + items.length + ' 条 / 技能 ' + abs.length + ' 条）'); var j3 = await getJSON('/apg/admin/item/ability?page=' + p3 + '&page_size=100'); var L3 = (j3.data && j3.data.list) || []; ipages = p3; if (!L3.length) break; L3.forEach(function (x) { items.push(pack(x)); }); if (L3.length < 100) break; } var heroes = []; try { step('英雄名册…（技能已 ' + abs.length + ' 条）'); var jh = await getJSON('/apg/admin/hero/list', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }); var LH = Array.isArray(jh.data) ? jh.data : ((jh.data && jh.data.list) || []); LH.forEach(function (h) { heroes.push({ i: h.id, zh: h.name_zh || '', en: h.name_en || '', a: h.attribute_primary || '', s: ids(h.ability_map) }); }); } catch (e) { heroes = []; } if (!tags.length || !abs.length) throw new Error('抓到的数据为空 —— 请确认已登录后台并有编辑权限'); step('生成文件…'); var payload = { ok: true, fetchedAt: new Date().toISOString(), tagCount: tags.length, abilityCount: abs.length, itemCount: items.length, heroCount: heroes.length, pages: pages, itemPages: ipages, tags: tags, abilities: abs, items: items, heroes: heroes }; var txt = JSON.stringify(payload); var sizeKB = Math.round(txt.length / 1024); var url = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); var a = D.createElement('a'); a.href = url; a.download = '_raw.json'; a.style.display = 'none'; D.body.appendChild(a); a.click(); D.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 30000); paint('✓ 已下载 _raw.json（' + sizeKB + ' KB）', 'Tag ' + tags.length + ' 条 · 技能 ' + abs.length + ' 条 · 英雄 ' + heroes.length + ' 个<br>' + '下一步：打开检索器 → 右上角「⟳ 更新本地数据」→「选择文件载入…」→ 选刚下载的 _raw.json' + '<br><span style="opacity:.6">本浮层不会自动关闭，可手动关掉浏览器标签或刷新页面。</span>', true); } catch (e) { paint('✗ 抓取失败', (e && e.message ? e.message : String(e)) + '<br><span style="opacity:.7">若提示未登录，请先登录后台再点书签；' + '若书签被浏览器拦截（CSP），可在后台页按 F12 打开控制台，把书签代码粘贴进去回车。</span>', false); } })();</script>
+<script type="text/plain" id="bkmkSrc">(async function () { 'use strict'; var D = document; if (!/^partner\.dota2\.com\.cn$/i.test(location.hostname)) { alert('请先在已登录的 partner.dota2.com.cn 后台页面使用本抓取书签。'); return; } var box = D.getElementById('__tsbkBox'); if (!box) { box = D.createElement('div'); box.id = '__tsbkBox'; box.setAttribute('style', 'position:fixed;right:18px;bottom:18px;z-index:2147483647;width:336px;' + 'background:#101418;color:#e8eef5;border:1px solid #2c3946;border-radius:10px;padding:12px 14px;' + 'font:13px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.45)'); D.body.appendChild(box); } function paint(title, body, ok) { box.innerHTML = '<div style="font-weight:600;color:' + (ok === false ? '#ff9d9d' : ok ? '#8fe3a8' : '#cfe3ff') + ';margin-bottom:4px">' + title + '</div><div style="opacity:.85">' + body + '</div>'; } function step(t) { paint('正在抓取后台数据…', t); } step('准备中…'); function jarr(v) { if (v == null || v === '') return []; if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return []; } function ids(v) { if (v == null || v === '') return []; var out = [], arr = jarr(v); if (arr.length) { arr.forEach(function (x) { var n = parseInt(x, 10); if (!isNaN(n) && n > 0) out.push(n); }); return out; } if (typeof v === 'string') { v.split(',').forEach(function (t) { var n = parseInt(t, 10); if (!isNaN(n) && n > 0) out.push(n); }); } return out; } function pack(x) { var eff = jarr(x.skill_effect).map(function (e) { return { n: e.effect_input || '', t: ids(e.effect_tag) }; }); var mech = [], feat = []; jarr(x.skill_mechanism).forEach(function (mm) { var n = parseInt(mm.mechanism_tag, 10); if (isNaN(n) || n <= 0) return; mech.push(n); feat.push({ i: n, c: String(mm.mechanism_input == null ? '' : mm.mechanism_input) }); }); return { i: x.id, n: x.name_zh || '', en: x.name_en || '', d: ids(x.skill_detail), g: ids(x.tags), m: mech, f: feat, e: eff, note: String(x.skill_notes == null ? '' : x.skill_notes), cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim(), ut: parseInt(x.update_time, 10) || 0 }; } function getJSON(url, opt) { var o = opt || { credentials: 'include' }; if (!o.credentials) o.credentials = 'include'; return fetch(url, o).then(function (r) { if (r.status === 401 || r.status === 403) throw new Error('未登录或登录已过期（HTTP ' + r.status + '）'); if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + url); return r.json(); }).then(function (j) { if (j && typeof j.code === 'number' && j.code !== 0) { throw new Error('接口返回 code=' + j.code + (j.msg ? '（' + j.msg + '）' : '') + ' —— 请确认已登录后台'); } return j; }); } try { var tags = []; for (var p = 1; p <= 50; p++) { step('Tag 第 ' + p + ' 页…（已 ' + tags.length + ' 条）'); var j = await getJSON('/apg/admin/mechanism/list?page=' + p); var L = (j.data && j.data.list) || (j.data && j.data.data) || []; if (!L.length) break; L.forEach(function (t) { tags.push({ id: t.id, name: t.name, c1: t.cate1 || '', c2: t.cate2 || '', sort: t.sort, pid: t.pid }); }); } var abs = [], pages = 0; for (var p2 = 1; p2 <= 50; p2++) { step('技能第 ' + p2 + ' 页…（已 ' + abs.length + ' 条 / Tag ' + tags.length + '）'); var j2 = await getJSON('/apg/admin/hero/ability?page=' + p2); var L2 = (j2.data && j2.data.list) || []; pages = p2; if (!L2.length) break; L2.forEach(function (x) { abs.push(pack(x)); }); } var items = [], ipages = 0; for (var p3 = 1; p3 <= 30; p3++) { step('物品技能第 ' + p3 + ' 页…（已 ' + items.length + ' 条 / 技能 ' + abs.length + ' 条）'); var j3 = await getJSON('/apg/admin/item/ability?page=' + p3 + '&page_size=100'); var L3 = (j3.data && j3.data.list) || []; ipages = p3; if (!L3.length) break; L3.forEach(function (x) { items.push(pack(x)); }); if (L3.length < 100) break; } var itemRefs = [], itemDataCount = 0; try { var refSet = {}; for (var p4 = 1; p4 <= 12; p4++) { step('道具数据第 ' + p4 + ' 页…（现版本技能引用 ' + Object.keys(refSet).length + '）'); var j4 = await getJSON('/apg/admin/item/list?page=' + p4 + '&page_size=100'); var L4 = (j4.data && j4.data.list) || []; if (!L4.length) break; itemDataCount += L4.length; L4.forEach(function (it) { var c1 = String(it.cate1 == null ? '' : it.cate1).trim(); if (!c1) return; if (c1 === '已移除物品' || c1 === '未发布物品') return; var am = it.ability_map; if (Array.isArray(am)) { am.forEach(function (x) { var n = parseInt(x, 10); if (n > 0) refSet[n] = 1; }); } else { String(am == null ? '' : am).split(',').forEach(function (s) { var n = parseInt(s.trim(), 10); if (n > 0) refSet[n] = 1; }); } }); if (L4.length < 100) break; } itemRefs = Object.keys(refSet).map(function (k) { return parseInt(k, 10); }).sort(function (a, b) { return a - b; }); } catch (e) { itemRefs = []; } var heroes = []; try { step('英雄名册…（技能已 ' + abs.length + ' 条）'); var jh = await getJSON('/apg/admin/hero/list', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }); var LH = Array.isArray(jh.data) ? jh.data : ((jh.data && jh.data.list) || []); LH.forEach(function (h) { heroes.push({ i: h.id, zh: h.name_zh || '', en: h.name_en || '', a: h.attribute_primary || '', s: ids(h.ability_map) }); }); } catch (e) { heroes = []; } if (!tags.length || !abs.length) throw new Error('抓到的数据为空 —— 请确认已登录后台并有编辑权限'); step('生成文件…'); var creepRefs = ["creep_siege","creep_irresolute","creep_piercing","flagbearer_creep_aura_effect","chen_martyrdom","neutral_upgrade","mud_golem_hurl_boulder","ghost_frost_attack","alpha_wolf_command_aura","alpha_wolf_critical_strike","ancient_rock_golem_weakening_aura","berserker_troll_break","big_thunder_lizard_frenzy","big_thunder_lizard_slam","big_thunder_lizard_wardrums_aura","black_dragon_dragonhide_aura","black_dragon_fireball","black_dragon_splash_attack","black_drake_magic_amplification_aura","centaur_khan_endurance_aura","centaur_khan_war_stomp","dark_troll_warlord_ensnare","dark_troll_warlord_raise_dead","enraged_wildkin_hurricane","abyssal_underlord_portal_warp","twin_gate_portal_warp","ability_capture","ability_lamp_use","enraged_wildkin_tornado","enraged_wildkin_toughness_aura","fel_beast_haunt","forest_troll_high_priest_heal","forest_troll_high_priest_heal_amp_aura","forest_troll_high_priest_mana_aura","frostbitten_golem_time_warp_aura","furbolg_enrage_attack_speed","furbolg_enrage_damage","giant_wolf_intimidate","gnoll_assassin_envenomed_weapon","granite_golem_hp_aura","harpy_scout_take_off","harpy_storm_chain_lightning","ice_shaman_incendiary_bomb","kobold_disarm","kobold_taskmaster_speed_aura","kobold_tunneler_prospecting","mud_golem_rock_destroy","mudgolem_cloak_aura","ogre_bruiser_ogre_smash","ogre_magi_frost_armor","polar_furbolg_ursa_warrior_thunder_clap","roshan_bash","roshan_devotion","roshan_spell_block","roshan_slam","roshan_inherent_buffs","satyr_hellcaller_shockwave","satyr_hellcaller_unholy_aura","satyr_soulstealer_mana_burn","satyr_trickster_purge","spawnlord_aura","spawnlord_master_freeze","spawnlord_master_stomp","warpine_raider_seed_shot","neutral_spell_immunity","beastmaster_boar_poison","beastmaster_hawk_dive","broodmother_poison_sting","broodmother_spawn_spiderite","forged_spirit_melting_strike","undying_tombstone_zombie_deathstrike","hill_troll_rally","necronomicon_archer_aoe","necronomicon_warrior_last_will","necronomicon_warrior_mana_burn","warlock_imp_explode","skeleton_king_bone_guard_damage_tracker","brewmaster_primal_split_cancel","brewmaster_earth_hurl_boulder","brewmaster_earth_pulverize","brewmaster_earth_spell_immunity","brewmaster_fire_permanent_immolation","brewmaster_fire_phase","brewmaster_storm_cyclone","brewmaster_storm_dispel_magic","brewmaster_storm_wind_walk","elder_titan_echo_stomp_spirit","elder_titan_natural_order_spirit","lone_druid_savage_roar_bear","lone_druid_spirit_bear_demolish","lone_druid_spirit_bear_entangle","lone_druid_spirit_bear_return","visage_summon_familiars_recall","visage_summon_familiars_stone_form","warlock_golem_flaming_fists","warlock_golem_permanent_immolation","tornado_tempest","broodmother_spin_web_destroy","techies_remote_mines_self_detonate","templar_assassin_self_trap","courier_burst","courier_shield","backdoor_protection","backdoor_protection_in_base","tower_aura","tower_truesight_aura","invulnerable","armor_per_barracks","fountain_passive","fountain_aura","fountain_invulnerability"]; var payload = { ok: true, fetchedAt: new Date().toISOString(), tagCount: tags.length, abilityCount: abs.length, itemCount: items.length, heroCount: heroes.length, itemDataCount: itemDataCount, itemRefCount: itemRefs.length, pages: pages, itemPages: ipages, tags: tags, abilities: abs, items: items, heroes: heroes, itemRefs: itemRefs, creepRefs: creepRefs }; var txt = JSON.stringify(payload); var sizeKB = Math.round(txt.length / 1024); var url = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); var a = D.createElement('a'); a.href = url; a.download = '_raw.json'; a.style.display = 'none'; D.body.appendChild(a); a.click(); D.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 30000); paint('✓ 已下载 _raw.json（' + sizeKB + ' KB）', 'Tag ' + tags.length + ' 条 · 技能 ' + abs.length + ' 条 · 英雄 ' + heroes.length + ' 个<br>' + '下一步：打开检索器 → 右上角「⟳ 更新本地数据」→「选择文件载入…」→ 选刚下载的 _raw.json' + '<br><span style="opacity:.6">本浮层不会自动关闭，可手动关掉浏览器标签或刷新页面。</span>', true); } catch (e) { paint('✗ 抓取失败', (e && e.message ? e.message : String(e)) + '<br><span style="opacity:.7">若提示未登录，请先登录后台再点书签；' + '若书签被浏览器拦截（CSP），可在后台页按 F12 打开控制台，把书签代码粘贴进去回车。</span>', false); } })();</script>
 <!-- BKMK_END -->
 
 <script src="data.js"></script>
@@ -543,9 +559,9 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   }
 
   // ---------- 技能筛选（按数据来源；登记表见 search-core.js 的 SOURCES） ----------
-  // 现已有「现版本英雄技能」「物品技能」「目录外技能」三类；其余来源接入后，
-  // 在登记表里把对应条目的 ready 改成 true，这里就会自动多出一个勾选项。
-  // 默认勾选除 def:false 以外的（目录外技能=旧版本残留，默认不参与检索）
+  // 现已有「现版本英雄技能」「现版本物品技能」「目录外技能」「非现版本物品技能」「非英雄单位技能」五类；
+  // 其余来源接入后，在登记表里把对应条目的 ready 改成 true，这里就会自动多出一个勾选项。
+  // 默认勾选除 def:false 以外的现版本来源（现版本英雄 / 现版本物品 / 现版本非英雄单位；目录外 / 非现版本物品默认不参与检索）
   var SRC_READY = core.SOURCES.filter(function (s) { return s.ready; });
   var srcSel = new Set(SRC_READY.filter(function (s) { return s.def !== false; })
     .map(function (s) { return s.key; }));
@@ -789,6 +805,13 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     return f(min) + ' ~ ' + f(max);
   }
 
+  // ---------- 匹配粒度（三档） ----------
+  /** 读取当前匹配粒度：'skill' 整条技能 / 'effect' 效果类同条目 / 'all' 全部 tag 同条目 */
+  function readUnitMode() {
+    var el = document.querySelector('input[name="unitMode"]:checked');
+    return el ? el.value : 'effect';
+  }
+
   // ---------- 检索（Tag 模式） ----------
   function runTag(quiet) {
     quiet = (quiet === true);
@@ -800,7 +823,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     var q = {
       and: collect('and'), or: collect('or'), not: collect('not'),
       scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
-      matchUnit: $('matchUnit').checked,
+      unitMode: readUnitMode(),
       cast: castOn ? { min: cast.min, max: cast.max } : null,
       heroes: heroes, sources: sources
     };
@@ -942,9 +965,12 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       }
     }
     if (r.stats && r.stats.unit && r.stats.unit.on && r.stats.unit.out) {
-      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>效果类 tag 同一效果条目</b>匹配：另有 <b>' +
-        r.stats.unit.out + '</b> 条技能虽然含全部 tag，但<b>效果类</b> tag 分散在不同效果条目里（例如 A 在效果1、B 在效果2），' +
-        '未计入结果。取消左侧「效果类 tag 需同一效果条目」可改回「整技能合并判断」。</div>';
+      var uAll = r.stats.unit.unitMode === 'all';
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>' + (uAll ? '所有 tag 同一效果条目' : '效果类 tag 同一效果条目') +
+        '</b>匹配：另有 <b>' +
+        r.stats.unit.out + '</b> 条技能虽然含全部 tag，但' + (uAll ? '这些 tag' : '<b>效果类</b> tag') +
+        ' 分散在不同效果条目里（例如 A 在效果1、B 在效果2），' +
+        '未计入结果。把左侧「匹配粒度」调低一档可放开该限制。</div>';
     }
     if (r.stats && r.stats.ambig && r.stats.ambig.length) {
       // 同名多义：提醒用户当前匹配的是「全部含义」，可改成只匹配某一种
@@ -964,7 +990,8 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       var ntEff = (nt.effNames || []).map(function (x) { return '「<b>' + esc(x) + '</b>」'; }).join('、');
       var ntGen = (nt.genNames || []).map(function (x) { return '「<b>' + esc(x) + '</b>」'; }).join('、');
       var ntRule = [];
-      if (ntEff) ntRule.push('效果类 ' + ntEff + ' 只在<b>命中的那个效果条目</b>里排除');
+      var ntAll = (r.stats.unit && r.stats.unit.unitMode) === 'all';
+      if (ntEff) ntRule.push((ntAll ? '须同条目的 ' : '效果类 ') + ntEff + ' 只在<b>命中的那个效果条目</b>里排除');
       if (ntGen) ntRule.push('技能级 ' + ntGen + ' 只要技能里出现就整条剔除');
       if (!ntRule.length) ntRule.push('技能里出现 ' + nmTxt + ' 即整条剔除（任一命中即排除）');
       html += '<div class="infobox" style="margin:12px 14px 0">已按<b>反选</b>剔除 <b>' + nt.out + '</b> 条 —— ' +
@@ -1760,6 +1787,24 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       return i;
     }
 
+    /* 「本次抓取日更新」判定（与 build_data.py 的 is_fresh 同口径）：
+       update_time 与 fetchedAt 落在同一本地日历日 → 条目标 nx=1，
+       search-core 的 excludeKind 据此跳过「id ≥ 20000 = 自定义技能」排除，
+       即使没勾「包含被排除项」，后台刚新建/刚改过的技能也能直接检索到。 */
+    var fetchDayKey = (function () {
+      var t = d.fetchedAt ? new Date(d.fetchedAt) : new Date();
+      if (isNaN(t.getTime())) t = new Date();
+      return t.getFullYear() + '-' + t.getMonth() + '-' + t.getDate();
+    })();
+    function isFreshUt(ut) {
+      var n = parseInt(ut, 10) || 0;
+      if (n <= 0) return false;
+      if (n > 1e12) n = Math.floor(n / 1000);
+      var x = new Date(n * 1000);
+      if (isNaN(x.getTime())) return false;
+      return (x.getFullYear() + '-' + x.getMonth() + '-' + x.getDate()) === fetchDayKey;
+    }
+
     var heroes = [], skillHero = {}, hlist = d.heroes || [];
     for (var i = 0; i < hlist.length; i++) {
       var h = hlist[i] || {};
@@ -1775,16 +1820,25 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       }
     }
 
-    /* 两类来源共用同一套池化：abilities = 英雄技能（不写 src，缺省 'hero'）；
-     * items = 物品技能（写 src:'item'）。物品技能 id 与英雄技能不是同一编号空间，不查 ability_map。 */
-    var out = [];
+    /* 三类来源共用同一套池化：abilities = 英雄技能（命中非英雄单位技能表的写 src:'creep'，其余缺省 'hero'）；
+     * items = 物品技能（写 src:'item'）。物品技能 id 与英雄技能不是同一编号空间，不查 ability_map。
+     * itemRefs = 现版本物品技能 id（道具数据 item/list 里 **cate1 非空且非已移除/未发布** 道具的 ability_map）→ 写 cur:1。
+     * creepRefs = 非英雄单位技能代码名（本地《编写规范/非英雄单位技能.md》，构建时注入 _raw.json）→ 写 src:'creep'。 */
+    var out = [], itemRefs = {}, itemCur = false, creepRefs = {};
+    (d.itemRefs || []).forEach(function (x) { var k = parseInt(x, 10); if (k > 0) itemRefs[k] = 1; });
+    itemCur = Object.keys(itemRefs).length > 0;
+    (d.creepRefs || []).forEach(function (x) { var k = String(x == null ? '' : x); if (k) creepRefs[k] = 1; });
     function pushList(list, srcKey) {
       for (var n = 0; n < list.length; n++) {
         var a = list[n] || {};
         var b = { i: a.i, n: a.n, en: a.en, d: a.d || [], g: a.g || [], m: a.m || [], e: a.e || [] };
-        var hs = srcKey ? null : skillHero[a.i];
+        if (isFreshUt(a.ut)) b.nx = 1;
+        /* 来源：显式传入（物品技能）优先；否则命中非英雄单位技能表 → creep，其余缺省 hero */
+        var key = srcKey || (creepRefs[a.en] ? 'creep' : null);
+        var hs = key ? null : skillHero[a.i];
         if (hs && hs.length) b.h = hs;
-        if (srcKey) b.src = srcKey;
+        if (key) b.src = key;
+        if (key && itemCur && itemRefs[a.i]) b.cur = 1;
 
         var rawF = a.f || [], fidx = [];
         for (var q = 0; q < rawF.length; q++) {
@@ -1819,7 +1873,8 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       featText: featText,
       notePool: notePool,
       abilities: out,
-      heroes: heroes
+      heroes: heroes,
+      itemCur: itemCur
     };
   }
 
@@ -1915,7 +1970,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       var q = {
         and: collect('and'), or: collect('or'), not: collect('not'),
         scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
-        matchUnit: $('matchUnit').checked,
+        unitMode: readUnitMode(),
         cast: (min == null && max == null) ? null : { min: min, max: max },
         heroes: readHeroes(), sources: readSources()
       };
@@ -1926,7 +1981,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       var q = {
         and: collect('and'), or: collect('or'), not: collect('not'),
         scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
-        matchUnit: $('matchUnit').checked,
+        unitMode: readUnitMode(),
         cast: null, heroes: ids || [], sources: readSources()
       };
       return core.search(idx, q);
@@ -1936,7 +1991,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       var q = {
         and: collect('and'), or: collect('or'), not: collect('not'),
         scope: scope(), fuzzy: $('fuzzy').checked, includeExcluded: $('showEx').checked,
-        matchUnit: $('matchUnit').checked,
+        unitMode: readUnitMode(),
         cast: null, heroes: readHeroes(), sources: keys || []
       };
       return core.search(idx, q);
@@ -2041,9 +2096,9 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     var ww = (o.length === 1)
       ? '<span class="ww">⚠ 「或」只填了 1 项 —— 此时它等价于「且」（必须包含该项），不构成「或」。「或」至少需要 2 项。</span>'
       : '';
-    var unitOn = $('matchUnit') ? $('matchUnit').checked : true;
-    var uSeg = '<span class="p ' + (unitOn ? 'unit' : 'anyk') + '">' +
-      (unitOn ? '效果类同一条目' : '整技能合并') + '</span>';
+    var um = readUnitMode();
+    var uSeg = '<span class="p ' + (um === 'skill' ? 'anyk' : 'unit') + '">' +
+      (um === 'all' ? '全部tag同一条目' : (um === 'effect' ? '效果类同一条目' : '整技能合并')) + '</span>';
     e.innerHTML = seg.length
       ? '<span class="lb">当前条件：</span>' + uSeg + seg.join(' <span class="join">且</span> ') + ww
       : '<span class="dim">当前条件：（未设置）</span>';
@@ -2084,8 +2139,10 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   $('fuzzy').addEventListener('change', function () { revalidateAll(true); });
   // 「包含被排除项」勾选后立即用同一条件重跑（若已有检索结果）
   $('showEx').addEventListener('change', function () { if (S.tag) runTag(); });
-  // 切换匹配粒度（同一效果内 / 整技能合并）同样立即重跑
-  $('matchUnit').addEventListener('change', function () { updateExpr(); if (S.tag) runTag(); });
+  // 切换匹配粒度（整技能 / 效果类同条目 / 全部 tag 同条目）同样立即重跑
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="unitMode"]'), function (el) {
+    el.addEventListener('change', function () { updateExpr(); if (S.tag) runTag(); });
+  });
 
   // ---------- 注释检索的交互 ----------
   $('btnRunN').addEventListener('click', runNote);
