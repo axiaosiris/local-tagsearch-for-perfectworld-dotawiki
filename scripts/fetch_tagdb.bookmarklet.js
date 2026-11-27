@@ -6,7 +6,8 @@
 //
 // 抓取内容与 scripts/fetch_tagdb.js（维护者用 refresh.sh 走 bsk）完全一致：
 //   tags    = 「Tag管理」全量 [{id,name,c1,c2,sort,pid}]
-//   abilities = 「技能」全量 [{i,n,en,d,g,m,f,e,note,cp}]
+//   abilities = 「技能」全量 [{i,n,en,d,g,m,f,e,note,cp,bx}]
+//   bx = 加成属性数据项：名称含 {%加成tag id%} 且 isShow=1 的自定义中文名 [{k,n,t:[tag id…]}]
 //   items   = 「内容管理-道具技能」全量（同上结构，构建阶段标 src='item'）
 //   heroes  = 「内容管理-英雄数据」全量 [{i,zh,en,a,s}]
 //   itemRefs = 现版本物品技能 id（道具数据 item/list 里「有分类（cate1 非空且非已移除/未发布）」道具的 ability_map）
@@ -61,6 +62,96 @@
     }
     return out;
   }
+  // ability_special_map（对象型 JSON 字符串）→ 对象
+  function jobj(v) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) return v;
+    if (typeof v === 'string') {
+      try { var o = JSON.parse(v); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; }
+      catch (e) { return {}; }
+    }
+    return {};
+  }
+  // 加成属性数据项：名称含 {%加成tag id%} 且开启；按替换符检索即可，不区分数据项分区。
+  // ⚠ 物品技能无 *_is_show 字段、front 恒为空数组：无开关字段视为开启，只有显式 0 才排除
+  function bonusItems(v) {
+    var s = jobj(v), arr = s.ability_special_map_front, out = [], seen = {};
+    if (!Array.isArray(arr) || !arr.length) {
+      arr = [];
+      Object.keys(s).forEach(function (k) {
+        if (!/_custom_name$/.test(k)) return;
+        var f = k.replace(/_custom_name$/, '');
+        arr.push({ customName: s[k], isShow: s[f + '_is_show'], fieldBack: k });
+      });
+    }
+    arr.forEach(function (it) {
+      // 无开关字段（物品技能整类都没有）→ 视为开启；只有显式 0 才排除
+      if (it.isShow != null && parseInt(it.isShow, 10) !== 1) return;
+      var nm = String(it.customName == null ? '' : it.customName), ids = [], mm;
+      var re = /\{%(\d+)%\}/g;
+      while ((mm = re.exec(nm)) !== null) {
+        var id = parseInt(mm[1], 10);
+        if (bonusIds[id] && ids.indexOf(id) < 0) ids.push(id);
+      }
+      if (!ids.length) return;
+      var k = String(it.fieldBack || ''), key = k + '|' + nm;
+      if (seen[key]) return;
+      seen[key] = 1;
+      out.push({ k: k, n: nm, t: ids });
+    });
+    return out;
+  }
+  /** 数值数据项（2026-11-27 数值检索）：所有「自定义中文名 + 数值」的项。
+   *  数值口径（用户定）：常规值 = 前缀 + valueFront + 后缀；手填值(custom_covervalue) = 原样，不加前后缀。
+   *  紧凑格式 vx=[[名称, 数值文本, 前缀, 后缀, 手填标志, [关联tag id…], [替换符tag id…]], …]
+   *  ⚠ 物品技能无 is_show / front 恒空：无开关字段视为开启（同 bonusItems）。 */
+  function valueItems(v) {
+    var s = jobj(v), arr = s.ability_special_map_front, out = [], seen = {};
+    if (!Array.isArray(arr) || !arr.length) {
+      arr = [];
+      Object.keys(s).forEach(function (k) {
+        if (!/_custom_name$/.test(k)) return;
+        var f = k.replace(/_custom_name$/, '');
+        var it = { customName: s[k], fieldBack: f };
+        if (s[f + '_is_show'] != null) it.isShow = s[f + '_is_show'];
+        // 把平铺的 covervalue / prefix / suffix 挂到 it 上，和 front 统一取值
+        if (s[f + '_custom_covervalue'] != null) it.customCoverValue = s[f + '_custom_covervalue'];
+        if (s[f + '_custom_prefix'] != null) it.customPrefix = s[f + '_custom_prefix'];
+        if (s[f + '_custom_suffix'] != null) it.customSuffix = s[f + '_custom_suffix'];
+        var rt = s[f + '_custom_relatetag'];
+        if (rt != null) it.customRelateTag = rt;
+        arr.push(it);
+      });
+    }
+    arr.forEach(function (it) {
+      if (it.isShow != null && parseInt(it.isShow, 10) !== 1) return;
+      var nm = String(it.customName == null ? '' : it.customName).trim();
+      if (!nm || nm === '//') return;
+      var f = String(it.fieldBack || '').replace(/_custom_name$/, '');
+      // 手填值优先：covervalue 在 front 项上或平铺键上
+      var cov = it.customCoverValue != null ? it.customCoverValue : s[f + '_custom_covervalue'];
+      var hand = cov != null && String(cov).length > 0;
+      var vf = it.valueFront != null ? it.valueFront : s[f + '_custom_value'];
+      var raw = hand ? String(cov) : String(vf == null ? '' : vf);
+      if (!raw.trim()) return;
+      var pfx = hand ? '' : String(it.customPrefix == null ? '' : it.customPrefix);
+      var sfx = hand ? '' : String(it.customSuffix == null ? '' : it.customSuffix);
+      var val = pfx + raw + sfx;
+      // 关联 tag：front 用 customRelateTag，平铺用 f+'_custom_relatetag'
+      var rel = it.customRelateTag != null ? it.customRelateTag : s[f + '_custom_relatetag'];
+      var relIds = [];
+      if (Array.isArray(rel)) rel.forEach(function (x) { var id = parseInt(x, 10); if (id > 0 && relIds.indexOf(id) < 0) relIds.push(id); });
+      else if (rel != null) { var id1 = parseInt(rel, 10); if (id1 > 0) relIds.push(id1); }
+      // 替换符 tag（名称里的 {%id%}）
+      var phIds = [], mm, re = /\{%(\d+)%\}/g;
+      while ((mm = re.exec(nm)) !== null) { var tid = parseInt(mm[1], 10); if (tid > 0 && phIds.indexOf(tid) < 0) phIds.push(tid); }
+      var key = f + '|' + nm + '|' + val;
+      if (seen[key]) return;
+      seen[key] = 1;
+      out.push([nm, val, pfx, sfx, hand ? 1 : 0, relIds, phIds]);
+    });
+    return out;
+  }
+
   // 单条技能记录（英雄技能 / 物品技能共用同一套字段）→ 精简结构
   function pack(x) {
     var eff = jarr(x.skill_effect).map(function (e) {
@@ -84,7 +175,10 @@
       e: eff,
       note: String(x.skill_notes == null ? '' : x.skill_notes),
       cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim(),
-      ut: parseInt(x.update_time, 10) || 0
+      ut: parseInt(x.update_time, 10) || 0,
+      bx: bonusItems(x.ability_special_map),
+      // 数值数据项（所有自定义中文名 + 数值，供「数值检索」）；无则空数组
+      vx: valueItems(x.ability_special_map)
     };
   }
   function getJSON(url, opt) {
@@ -115,6 +209,12 @@
         tags.push({ id: t.id, name: t.name, c1: t.cate1 || '', c2: t.cate2 || '', sort: t.sort, pid: t.pid });
       });
     }
+
+    // 加成属性 tag id（tag 管理 → 图标 → 加成属性；动态取，tag 增减无需改代码）
+    var bonusIds = {};
+    tags.forEach(function (t) {
+      if ((t.c1 || '') === '图标' && (t.c2 || '') === '加成属性') bonusIds[t.id] = 1;
+    });
 
     // ---------- 2) 技能全量 ----------
     var abs = [], pages = 0;

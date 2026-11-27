@@ -3,8 +3,24 @@ data.js
 _raw.json
 *.crdownload
 
+# ---- 图标复制品（从 KVEdit 资源复制，涉及版权，不入库避免 DMCA）----
+icons/spellicons/
+icons/items/
+icons/heroes/
+icons/other_icons/
+icons/missing.json
+
+# ---- 图标映射（由 scripts/local_icons.py 生成，指向上面这些未入库的图标）----
+scripts/imgmap.json
+
 # ---- 构建产物（由 scripts/build_bookmarklet.py 生成，已内联进 index.html）----
 scripts/bookmarklet.min.txt
+
+# ---- 图标内联包（由 scripts/gen_icon_b64.py 从 icons/ 生成，7MB 级，不入库）----
+icons_b64.js
+
+# ---- 结果区截图（页面「截图」按钮产出，不入库）----
+screenshots/
 
 # ---- 测试残留 ----
 _nodata_test.html
@@ -28,6 +44,8 @@ npm-debug.log*
 
 # ---- 临时 / 调试 ----
 _scratch/
+_scratch*/
+_raw.json.bak*
 *.tmp
 *.log
 

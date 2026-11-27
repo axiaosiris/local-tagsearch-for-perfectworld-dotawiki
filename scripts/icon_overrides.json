@@ -1,0 +1,21 @@
+{
+ "Ability Upgrade": "aghanims_shard_roshan_png",
+ "Activate Arcane Rune": "bottle_arcane_png",
+ "Activate Bounty Rune": "bottle_bounty_png",
+ "Activate Haste Rune": "bottle_haste_png",
+ "Activate Illusion Rune": "bottle_illusion_png",
+ "Activate Invisibility Rune": "bottle_invisibility_png",
+ "Activate Shield Rune": "bottle_shield_png",
+ "Activate Water Rune": "bottle_water_png",
+ "Amplify Damage": "bottle_doubledamage_png",
+ "armor_per_barracks": "tower_armor_aura",
+ "fountain_aura": "fountain_heal",
+ "fountain_passive": "filler_ability",
+ "invulnerable": "modifier_invulnerable_png",
+ "invulnerable_hidden": "modifier_invulnerable_png",
+ "radar": "hud_radar_png",
+ "tower_aura": "tower_armor_aura",
+ "tower_truesight_aura": "ward_sentry",
+ "visage_summon_familiars_recall": "visage_summon_familiars",
+ "watch_tower_invulnerable": "modifier_invulnerable_png"
+}

@@ -1,22 +1,26 @@
 /* search-core.js —— 检索核心逻辑（浏览器 / Node 通用，无依赖）
  *
- * 两条**完全独立**的检索线（同一时间界面只展示其中一条）：
- *   A. Tag 检索 —— 按标签（tag）匹配技能的类型 / 效果 / 特性 / tags 字段
+ * 三条**完全独立**的检索线（同一时间界面只展示其中一条）：
+ *   A. Tag 检索 —— 按标签（tag）匹配技能的类型 / 效果 / 特性
  *   B. 注释检索 —— 在技能注释（skill_notes 富文本转成的纯文本行）中查找关键词
+ *   C. 加成检索 —— 按单个「图标/加成属性」tag 检索数据项自定义中文名里的替换符 {%tagid%}
+ *      （2026-11-23 新增）：单选 tag，命中来源是技能记录 ability_special_map 里 isShow=1 的
+ *      customName；构建阶段写成 a.bx=[[名称, [tag id…]], …]。见 bonusTags / searchBonus。
  *
  * A 的条件模型：
  *   and: [tagName…] 必须全部包含（且）
  *   or : [tagName…] 至少包含其一（或）——为空则不参与判断
  *   not: [tagName…] 全部不得包含（反选/排除）
  *   unitMode: 匹配粒度（三档，默认 'effect'）——决定「多个 tag 在多大范围里同时成立」：
- *        'skill'  整条技能合并：类型 ∪ 特性 ∪ tags 字段 ∪ 所有效果行，任意位置满足即可（最宽松）
+ *        'skill'  整条技能合并：类型 ∪ 特性 ∪ 所有效果行，任意位置满足即可（最宽松）
  *        'effect' 效果类 tag 需同一效果条目（默认）：只有「效果类」tag 必须落在同一个效果行里，
  *                 技能级 tag 仍可跨效果/类型/特性；例：且=[弱驱散, 眩晕] 只命中
  *                 「某个效果里同时有这两个 tag」的技能，「效果2有弱驱散、效果1有眩晕」不算命中
  *        'all'    所有 tag 需同一效果条目：除 SKILL_C2 里登记的「技能级类别」外，其余类别
  *                 （含 目标 / 包含效果 / 状态效果 / 驱散情况 / 伤害类型…）都必须落在同一条效果里
  *        （旧的 query.matchUnit:false 仍兼容，等价于 'skill'）
- *   scope: {d:技能类型, e:技能效果, m:技能特性, g:tags字段}
+ *   scope: {d:技能类型, e:技能效果, m:技能特性}
+ *          （原 g=tags字段 维度已于 2026-11-27 移除：后台 tags 字段内容过时，不再参与检索与展示）
  *   includeExcluded: 是否把「废弃/自定义/公式残条」条目也纳入检索（默认 false，即排除）
  *   cast: {min, max} 施法前摇闭区间（秒，null=该侧不限）——与 tag 条件**同时生效**，
  *         数据来自后台 ability_cast_point（注意 _back 后缀的是「施法后摇」）；
@@ -50,12 +54,16 @@
    *   noUse  —— 废弃条目：名称带「（废）」标记（如「贪魔的贪婪（废）」）；⚠️ 不能只判「含废字」，
    *             物品技能里有正常的「残废」会被误伤
    *   custom —— 自定义技能：id ≥ 20000（站内「自」标条目，非官方技能）
+   *             ⚠️ 两类例外不排除：① 本次抓取日更新过的（nx=1）；
+   *                ② 已登记在《编写规范/非英雄单位技能.md》的非英雄单位技能（src='creep'）。
+   *             「自」标条目是后台临时/废弃条目；而建筑机制条等 id≥20000 的是正式维护的技能，
+   *             只要进了留档表就应默认参与检索（2026-11-14 用户定）。
    *   junk   —— 公式残条：名称以「-{」开头（数据里残留的模板片段，如「-{s:value}秒 雪球冷却」）
    * 互斥判定，按上述顺序取第一个命中项，故各类计数之和 = 被排除总数。 */
   var CUSTOM_ID_MIN = 20000;
   var EXCLUDE_KINDS = [
     { key: 'noUse', label: '废弃条目', tip: '名称带「（废）」标记' },
-    { key: 'custom', label: '自定义技能', tip: 'id ≥ ' + CUSTOM_ID_MIN + '（本次抓取日更新过的除外）' },
+    { key: 'custom', label: '自定义技能', tip: 'id ≥ ' + CUSTOM_ID_MIN + '（已留档的非英雄单位技能、本次抓取日更新过的除外）' },
     { key: 'junk', label: '公式残条', tip: '名称以「-{」开头' }
   ];
 
@@ -68,11 +76,16 @@
     if (/[（(]废/.test(n)) return 'noUse';
     if (n.indexOf('-{') === 0) return 'junk';
     if (a.i >= CUSTOM_ID_MIN) {
-      // 例外（2026-11-10 用户定）：**本次抓取日更新过**的条目不算自定义技能排除，
+      // 例外①（2026-11-10 用户定）：**本次抓取日更新过**的条目不算自定义技能排除，
       // 即使没勾「包含被排除项」也照常参与检索 —— 后台刚新建/刚改过的技能（如建筑机制条）
       // 会立刻带 id ≥ 20000 落进来，若不豁免就要等人工勾选才能搜到。
       // 构建阶段（build_data.py / 页面 buildDbFromRaw）按 update_time 与 fetchedAt 同日算出 nx=1。
       if (a.nx) return null;
+      // 例外②（2026-11-14 用户定）：**已留档的非英雄单位技能**（代码名命中《非英雄单位技能.md》→
+      // 构建阶段写 src='creep'）永远不被 custom 排除。nx 只覆盖抓取当日，隔天刷新就失效；
+      // 建筑机制条 20316–20331 是正式维护的技能，长期要求「默认检索到」，故按来源豁免。
+      // 判定用 src 而非 id 白名单：留档表增删条目后无需改代码。
+      if (a.src === 'creep') return null;
       return 'custom';
     }
     return null;
@@ -418,6 +431,221 @@
     return base;
   }
 
+  /* ---------- 加成检索（2026-11-23 新增）----------
+   * 「Tag管理 → 图标 → 加成属性」下的 tag（当前 7 个）。命中来源是技能数据项的**自定义中文名**
+   * 里嵌的替换符 {%tagid%}（且该数据项处于开启状态）——抓取阶段已按 isShow=1 过滤后写进
+   *   a.bx = [[中文名(含替换符), [tag id…]], …]
+   * 用户口径（2026-11-23）：「检索替换符即可」，故内核不再区分数据项所属分区。
+   * 与 Tag 检索 / 注释检索完全独立：只支持单选 tag，不做且/或/非组合。
+   */
+  function bonusTags(index) {
+    var seen = {}, out = [];
+    (((index && index.db) || {}).tags || []).forEach(function (t) {
+      if (seen[t.id]) return;
+      if (String(t.c1 || '') !== '图标' || String(t.c2 || '') !== '加成属性') return;
+      seen[t.id] = 1;
+      out.push({ id: t.id, name: t.name });
+    });
+    out.sort(function (a, b) { return a.id - b.id; });
+    return out;
+  }
+
+  /** 按单个加成 tag 检索技能数据项。query={tag, sources, heroes, includeExcluded}
+   *  hits=[{id,name,en,heroes,ability,items:[{name,tags}],count}]，按技能 id 升序；
+   *  counts 为**所有**加成 tag 的数据项/技能命中数（一次遍历算出，供界面列标签时显示）。 */
+  function searchBonus(index, query) {
+    query = query || {};
+    var tag = parseInt(query.tag, 10) || 0;
+    var showExcluded = !!query.includeExcluded;
+    var srcKeys = normSources(query.sources);
+    var srcOn = srcKeys.length > 0;
+    var srcSet = new Set(srcKeys);
+    var srcOut = 0;
+    var heroIds = normHeroIds(query.heroes);
+    var heroOn = heroIds.length > 0;
+    var heroSet = new Set(heroIds);
+    var heroOut = 0;
+    var hits = [], counts = {}, skipped = 0;
+    var pool0 = srcOn ? srcPool(index, srcSet)
+      : { n: index.abilities.length, ex: index.excludedTotal || 0, by: index.excludedBy };
+    var base = {
+      tag: tag, hits: hits, counts: counts,
+      scanned: index.abilities.length,
+      stats: {
+        total: index.abilities.length,
+        excludedTotal: index.excludedTotal || 0,
+        poolExcluded: pool0.ex,
+        excludedBy: pool0.by || index.excludedBy || { noUse: 0, custom: 0, junk: 0 },
+        skipped: 0,
+        effective: pool0.n - pool0.ex,
+        includeExcluded: showExcluded,
+        hero: heroStats(index, heroOn, heroIds, 0),
+        src: sourceStats(index, srcKeys, 0)
+      }
+    };
+
+    index.abilities.forEach(function (a) {
+      var ex = excludeKind(a);
+      if (ex && !showExcluded) { skipped++; return; }
+      if (srcOn && !hasSource(a, srcSet)) { srcOut++; return; }
+      if (heroOn && !hasHero(a, heroSet)) { heroOut++; return; }
+      var bx = a.bx || [];
+      if (!bx.length) return;
+      // 加成项的名称与数值项（vx）的名称同源（ability_special_map.customName），
+      // 按名称一一对应取数值；口径与数值检索完全一致：vx[1] 已含常规值的前后缀 / 手填值原样。
+      // 两条数据线都由同一次抓取生成，实测 1025 个加成项全部能在 vx 中按名称唯一匹配。
+      var vxMap = {};
+      (a.vx || []).forEach(function (v) {
+        if (!Array.isArray(v) || v.length < 5) return;
+        var vk = String(v[0] == null ? '' : v[0]);
+        if (vk && !vxMap[vk]) vxMap[vk] = v;
+      });
+      var mine = [], inSkill = new Set();
+      bx.forEach(function (it) {
+        if (!it || !Array.isArray(it[1])) return;
+        var ids = it[1], nm = String(it[0] == null ? '' : it[0]);
+        var v = vxMap[nm] || [];
+        ids.forEach(function (id) {
+          if (!counts[id]) counts[id] = { items: 0, skills: 0 };
+          counts[id].items++;
+          inSkill.add(id);
+          if (tag && id === tag) mine.push({
+            name: nm, tags: ids.slice(),
+            value: String(v[1] == null ? '' : v[1]),
+            prefix: String(v[2] == null ? '' : v[2]),
+            suffix: String(v[3] == null ? '' : v[3]),
+            hand: parseInt(v[4], 10) === 1
+          });
+        });
+      });
+      inSkill.forEach(function (id) { if (counts[id]) counts[id].skills++; });
+      if (!mine.length) return;
+      hits.push({
+        id: a.i, name: a.n, en: a.en, heroes: heroesOf(index, a), ability: a,
+        items: mine, count: mine.length, excluded: ex || null, upgrades: upgrades(a)
+      });
+    });
+
+    hits.sort(function (x, y) { return (y.count - x.count) || (x.id - y.id); });
+    base.stats.skipped = skipped;
+    base.stats.hero = heroStats(index, heroOn, heroIds, heroOut);
+    base.stats.src = sourceStats(index, srcKeys, srcOut);
+    base.stats.tag = { on: !!tag, id: tag, name: (index.id2tag.get(tag) || {}).name || '', hits: hits.length };
+    return base;
+  }
+
+  /* ---------- 数值检索（2026-11-27）：按 tag 名称检索数值数据项 ----------
+   * 数据项 vx 紧凑格式：[名称, 数值文本, 前缀, 后缀, 手填标志, [关联tag id…], [替换符tag id…]]
+   * 命中口径：数据项的「关联 tag」或「名称里的替换符 tag」任一落在所选 tag 集合里即命中。
+   * query={tags:[tag名称或id…], sources, heroes, includeExcluded}
+   */
+  function resolveTagIds(index, list) {
+    var ids = [], names = [], miss = [];
+    (list || []).forEach(function (raw) {
+      var n = String(raw == null ? '' : raw).trim();
+      if (!n) return;
+      // 纯数字一律按 tag id 处理（候选点击后写入的就是 id），不再走名称模糊解析
+      if (/^\d+$/.test(n)) {
+        var id2 = parseInt(n, 10);
+        if (id2 > 0 && ids.indexOf(id2) < 0) {
+          ids.push(id2);
+          var tn = (index.id2tag.get(id2) || {}).name;
+          names.push(tn ? (tn + '（' + id2 + '）') : String(id2));
+        }
+        return;
+      }
+      var r = resolveName(index, n, true);
+      if (r && r.ids && r.ids.length) {
+        r.ids.forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); });
+        (r.names || []).forEach(function (x) { if (names.indexOf(x) < 0) names.push(x); });
+      } else {
+        miss.push(n);
+      }
+    });
+    return { ids: ids, names: names, miss: miss };
+  }
+
+  function searchValue(index, query) {
+    query = query || {};
+    var rt = resolveTagIds(index, query.tags);
+    var tagIds = rt.ids;
+    var tagSet = new Set(tagIds);
+    var showExcluded = !!query.includeExcluded;
+    var srcKeys = normSources(query.sources);
+    var srcOn = srcKeys.length > 0;
+    var srcSet = new Set(srcKeys);
+    var srcOut = 0;
+    var heroIds = normHeroIds(query.heroes);
+    var heroOn = heroIds.length > 0;
+    var heroSet = new Set(heroIds);
+    var heroOut = 0;
+    var hits = [], skipped = 0, noTag = 0;
+    var pool0 = srcOn ? srcPool(index, srcSet)
+      : { n: index.abilities.length, ex: index.excludedTotal || 0, by: index.excludedBy };
+    var base = {
+      tags: tagIds, tagNames: rt.names, tagMiss: rt.miss, hits: hits,
+      scanned: index.abilities.length,
+      stats: {
+        total: index.abilities.length,
+        excludedTotal: index.excludedTotal || 0,
+        poolExcluded: pool0.ex,
+        excludedBy: pool0.by || index.excludedBy || { noUse: 0, custom: 0, junk: 0 },
+        skipped: 0,
+        effective: pool0.n - pool0.ex,
+        includeExcluded: showExcluded,
+        hero: heroStats(index, heroOn, heroIds, 0),
+        src: sourceStats(index, srcKeys, 0)
+      }
+    };
+    if (!tagIds.length) {
+      base.stats.hero = heroStats(index, heroOn, heroIds, 0);
+      base.stats.src = sourceStats(index, srcKeys, 0);
+      return base;
+    }
+
+    index.abilities.forEach(function (a) {
+      var ex = excludeKind(a);
+      if (ex && !showExcluded) { skipped++; return; }
+      if (srcOn && !hasSource(a, srcSet)) { srcOut++; return; }
+      if (heroOn && !hasHero(a, heroSet)) { heroOut++; return; }
+      var vx = a.vx || [];
+      if (!vx.length) return;
+      var mine = [];
+      vx.forEach(function (it) {
+        if (!Array.isArray(it) || it.length < 5) return;
+        var rel = Array.isArray(it[5]) ? it[5] : [];
+        var ph = Array.isArray(it[6]) ? it[6] : [];
+        var matched = [];
+        tagIds.forEach(function (id) { if (rel.indexOf(id) >= 0 || ph.indexOf(id) >= 0) matched.push(id); });
+        if (!matched.length) return;
+        var nm = String(it[0] == null ? '' : it[0]);
+        var val = String(it[1] == null ? '' : it[1]);
+        var pfx = String(it[2] == null ? '' : it[2]);
+        var sfx = String(it[3] == null ? '' : it[3]);
+        var hand = parseInt(it[4], 10) === 1;
+        // 展示值：存储时常规值已含前后缀、手填值已原样，这里直接用 it[1]；pfx/sfx 供溯源标注
+        var tagNames2 = matched.map(function (id) { return (index.id2tag.get(id) || {}).name || String(id); });
+        mine.push({
+          name: nm, value: val, prefix: pfx, suffix: sfx, hand: hand,
+          related: rel.slice(), placeholders: ph.slice(), matched: matched,
+          matchedNames: tagNames2
+        });
+      });
+      if (!mine.length) return;
+      hits.push({
+        id: a.i, name: a.n, en: a.en, heroes: heroesOf(index, a), ability: a,
+        items: mine, count: mine.length, excluded: ex || null, upgrades: upgrades(a)
+      });
+    });
+
+    hits.sort(function (x, y) { return (y.count - x.count) || (x.id - y.id); });
+    base.stats.skipped = skipped;
+    base.stats.hero = heroStats(index, heroOn, heroIds, heroOut);
+    base.stats.src = sourceStats(index, srcKeys, srcOut);
+    base.stats.noTag = noTag;
+    return base;
+  }
+
   /* ---------- 英雄筛选 ---------- */
   /** 归一化英雄 id 数组（去空、去重） */
   function normHeroIds(list) {
@@ -455,8 +683,7 @@
     return {
       d: scope.d !== false,
       e: scope.e !== false,
-      m: scope.m !== false,
-      g: scope.g !== false
+      m: scope.m !== false
     };
   }
 
@@ -465,7 +692,6 @@
     scope = normalizeScope(scope);
     var s = new Set();
     if (scope.d) (a.d || []).forEach(function (x) { s.add(x); });
-    if (scope.g) (a.g || []).forEach(function (x) { s.add(x); });
     if (scope.m) (a.m || []).forEach(function (x) { s.add(x); });
     if (scope.e) (a.e || []).forEach(function (row) { (row.t || []).forEach(function (x) { s.add(x); }); });
     return s;
@@ -474,8 +700,8 @@
   /* ---------- 匹配粒度：tag 条件在哪个范围里同时成立 ----------
    * 一个技能的 tag 分放在几处，性质不同：
    *   技能类型 d / 技能特性 m —— 技能级属性（点目标、主动、会被破坏…），整条技能成立
-   *   tags 字段 g            —— 汇总，混进效果里会把不同效果的 tag 串起来，不参与效果条目判定
    *   技能效果 e 的每一行     —— 这才是「一个效果条目」
+   * （另有一处「tags 字段」汇总，2026-11-27 起判定为过时数据，已整体不参与检索/展示）
    *
    * 三档粒度（query.unitMode）：
    *   'skill'  整条技能合并 —— 不按效果行拆分（旧行为）
@@ -489,7 +715,7 @@
    * 「技能级类别」（SKILL_C2，2026-11-09 新增）= 不描述某个效果、只描述技能本身的类别，
    *   即使选 'all' 也不参与「同一效果条目」判定。实测依据（2026-11-09 数据）：
    *     技能行为 111 个全部挂 m（特性）、施法类型 80 个 99% 挂 d、技能类别 13 个全挂 d、
-   *     冷却类型 45 个挂 d、魔法消耗/生命消耗 挂 d、攻击命中判定 12 个全挂 g（tags 字段）、
+   *     冷却类型 45 个挂 d、魔法消耗/生命消耗 挂 d、攻击命中判定 12 个全挂 g（tags 字段，已停用）、
    *     施放技能时/面对控制时/指向性技能施法时 全挂 m、加成属性 未使用。
    *   若强行纳入（只排除 技能行为/施法类型）：且=[基础技能,眩晕] 会从 89 条直接归零。
    */
@@ -532,39 +758,26 @@
   }
 
   /** 技能的效果条目（判定单元）：每个效果行的 tag 集合。
-   *  tags 字段里那些「任何行都没有」的效果类残留 tag 视为技能级补充，挂到每行；
-   *  技能一行效果都没有（天赋加成、纯被动条目等）→ 整条技能算一个单元。
+   *  技能一行效果都没有（天赋加成、纯被动条目等）→ 整条技能算一个单元（类型 ∪ 特性）。
    *  mode: 'effect'（默认，按 EFFECT_C2）/ 'all'（除 SKILL_C2 外全部参与） */
   function effectRowsOf(a, scope, index, mode) {
     scope = normalizeScope(scope);
-    var rows = [], inRows = new Set();
+    var rows = [];
     if (scope.e) {
       (a.e || []).forEach(function (row, k) {
         var t = (row && row.t) || [];
         if (!t.length) return;
-        t.forEach(function (x) { inRows.add(x); });
         rows.push({
           i: k, n: (row && row.n) || '', ids: t.slice(),
           label: '效果' + (k + 1) + ((row && row.n) ? '「' + row.n + '」' : '')
         });
       });
     }
-    var residual = [];
-    if (scope.g && index) {
-      (a.g || []).forEach(function (x) {
-        if (!inRows.has(x) && isEffectTag(index, x, mode)) residual.push(x);
-      });
-    }
-    rows.forEach(function (r) {
-      var s = new Set(r.ids);
-      residual.forEach(function (x) { s.add(x); });
-      r.set = s;
-    });
+    rows.forEach(function (r) { r.set = new Set(r.ids); });
     if (!rows.length) {
-      var s = new Set(residual);
+      var s = new Set();
       if (scope.d) (a.d || []).forEach(function (x) { s.add(x); });
       if (scope.m) (a.m || []).forEach(function (x) { s.add(x); });
-      if (scope.g) (a.g || []).forEach(function (x) { s.add(x); });
       if (s.size) rows.push({ i: -1, n: '', ids: [], label: '整条技能', set: s });
     }
     return rows;
@@ -607,7 +820,6 @@
       var fs = index ? featsOf(index, a).filter(function (f) { return want.has(f.id); }) : [];
       out.push({ where: '技能特性', kind: 'm', feats: fs });
     }
-    if (scope.g && (a.g || []).some(hit)) out.push({ where: 'tags字段', kind: 'g' });
     if (scope.e) {
       (a.e || []).forEach(function (row, i) {
         if ((row.t || []).some(hit)) {
@@ -632,9 +844,8 @@
       inRow = true;
       out.push({ where: '效果' + (r.i + 1) + (row.n ? '「' + row.n + '」' : ''), kind: 'e', row: r.i + 1 });
     });
-    // 只出现在 tags 字段（或技能类型/特性）里的 tag：不在任何效果行内，位置直说
+    // 只出现在技能类型/特性里的 tag：不在任何效果行内，位置直说
     if (!inRow) {
-      if ((a.g || []).some(function (x) { return want.has(x); })) out.push({ where: 'tags字段', kind: 'g' });
       if ((a.d || []).some(function (x) { return want.has(x); })) out.push({ where: '技能类型', kind: 'd' });
       if ((a.m || []).some(function (x) { return want.has(x); })) {
         var fs = index ? featsOf(index, a).filter(function (f) { return want.has(f.id); }) : [];
@@ -715,7 +926,8 @@
 
   /* ---------- 升级项（升级来源） ----------
    * 后台「Tag 管理 → 升级 / 升级来源」共 13 条，作为 tag 挂在技能效果行的 effect_tag 上
-   * （少量出现在 tags 字段）。此处按固定顺序汇总、去重，供展示用。 */
+   * （少量只出现在 tags 字段）。tags 字段整体已停用，但**这里仍读 a.g**：
+   * 只靠 tags 字段登记的升级项如果漏读，升级图标会直接消失，故保留。 */
   var UPGRADE_ORDER = [1046, 1047, 1048, 1049, 1050, 1051, 1052, 1053, 1054, 1055, 1056, 1101, 1165];
   /* label = 界面显示的中文名（= 网页条目名去掉尾缀「升级」）
    * ph  = wiki 占位符本体（{%id%}，注释里写 {%id%}升级后/前）——不显示，只进 title / CSV
@@ -982,7 +1194,6 @@
         return true;
       });
     }
-    if (scope.g) out.tags = uniq(a.g);
     if (scope.e) out.effects = (a.e || []).map(function (row) { return { name: row.n, tags: uniq(row.t) }; });
     return out;
   }
@@ -991,6 +1202,10 @@
     createIndex: createIndex,
     search: search,
     searchNotes: searchNotes,
+    bonusTags: bonusTags,
+    searchBonus: searchBonus,
+    searchValue: searchValue,
+    resolveTagIds: resolveTagIds,
     noteLines: noteLines,
     noteStats: noteStats,
     tagSet: tagSet,

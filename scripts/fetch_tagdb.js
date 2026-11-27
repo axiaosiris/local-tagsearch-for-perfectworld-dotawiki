@@ -13,6 +13,12 @@
 //   e=[{n:效果行名, t:[effect_tag id…]}]
 //   cp=ability_cast_point 施法前摇原始文本（可能为空 / 带备注，如「0（魔晶）」）
 //   note=skill_notes 原始富文本 HTML（技能注释，构建阶段转成纯文本行）
+//   bx=加成属性数据项（2026-11-23 新增）：从 ability_special_map 里取「名称含加成属性 tag 替换符 {%id%}
+//    且该名称处于开启(isShow=1)状态」的项，格式 [{k:字段, n:中文名(含替换符), t:[加成tag id…]}]。
+//    加成属性 tag = tag 管理「图标 / 加成属性」（c1=图标 且 c2=加成属性），随 tags 动态取，不硬编码。
+//   vx=数值数据项（2026-11-27 新增）：所有「自定义中文名 + 数值」项，格式
+//     [名称, 数值文本, 前缀, 后缀, 手填标志, [关联tag id…], [替换符tag id…]]；
+//     常规值=前缀+valueFront+后缀，手填值(custom_covervalue)=原样不加前后缀。
 (async function () {
   var A = window.__A || {};
 
@@ -28,6 +34,12 @@
     });
     if (L.length < 100) break;
   }
+
+  // 加成属性 tag id（tag 管理 → 图标 → 加成属性；动态取，tag 增减无需改代码）
+  var bonusIds = {};
+  tags.forEach(function (t) {
+    if ((t.c1 || '') === '图标' && (t.c2 || '') === '加成属性') bonusIds[t.id] = 1;
+  });
 
   // ---------- 2) 技能全量 ----------
   function jarr(v) {
@@ -47,6 +59,102 @@
     if (typeof v === 'string') {
       v.split(',').forEach(function (t) { var n = parseInt(t, 10); if (!isNaN(n) && n > 0) out.push(n); });
     }
+    return out;
+  }
+
+  /** JSON 字符串 → 对象（ability_special_map 是对象型 JSON，不能用 jarr） */
+  function jobj(v) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) return v;
+    if (typeof v === 'string') {
+      try { var o = JSON.parse(v); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; }
+      catch (e) { return {}; }
+    }
+    return {};
+  }
+
+  /** 加成属性数据项：名称含 {%加成tag id%} 且 isShow=1 的「自定义中文名」项。
+   *  用户口径（2026-11-23）：只按替换符检索即可，不区分数据项分区。
+   *  优先用 ability_special_map_front（已含 customName/isShow）；缺项时由 *_custom_name / *_is_show 配对还原。
+   *  ⚠ 物品技能（/apg/admin/item/ability）没有 *_is_show 字段、front 恒为空数组：无开关字段视为开启。
+   *  只有显式 isShow=0 才排除；英雄技能 front 里的 isShow 仍照常判定。 */
+  function bonusItems(v) {
+    var s = jobj(v), arr = s.ability_special_map_front, out = [], seen = {};
+    if (!Array.isArray(arr) || !arr.length) {
+      arr = [];
+      Object.keys(s).forEach(function (k) {
+        if (!/_custom_name$/.test(k)) return;
+        var f = k.replace(/_custom_name$/, '');
+        arr.push({ customName: s[k], isShow: s[f + '_is_show'], fieldBack: k });
+      });
+    }
+    arr.forEach(function (it) {
+      // 无开关字段（物品技能整类都没有）→ 视为开启；只有显式 0 才排除
+      if (it.isShow != null && parseInt(it.isShow, 10) !== 1) return;
+      var nm = String(it.customName == null ? '' : it.customName), ids = [], mm;
+      var re = /\{%(\d+)%\}/g;
+      while ((mm = re.exec(nm)) !== null) {
+        var id = parseInt(mm[1], 10);
+        if (bonusIds[id] && ids.indexOf(id) < 0) ids.push(id);
+      }
+      if (!ids.length) return;
+      var k = String(it.fieldBack || '');
+      var key = k + '|' + nm;
+      if (seen[key]) return;
+      seen[key] = 1;
+      out.push({ k: k, n: nm, t: ids });
+    });
+    return out;
+  }
+
+  /** 数值数据项（2026-11-27 数值检索）：所有「自定义中文名 + 数值」的项。
+   *  数值口径（用户定）：常规值 = 前缀 + valueFront + 后缀；手填值(custom_covervalue) = 原样，不加前后缀。
+   *  紧凑格式 vx=[[名称, 数值文本, 前缀, 后缀, 手填标志, [关联tag id…], [替换符tag id…]], …]
+   *  ⚠ 物品技能无 is_show / front 恒空：无开关字段视为开启（同 bonusItems）。 */
+  function valueItems(v) {
+    var s = jobj(v), arr = s.ability_special_map_front, out = [], seen = {};
+    if (!Array.isArray(arr) || !arr.length) {
+      arr = [];
+      Object.keys(s).forEach(function (k) {
+        if (!/_custom_name$/.test(k)) return;
+        var f = k.replace(/_custom_name$/, '');
+        var it = { customName: s[k], fieldBack: f };
+        if (s[f + '_is_show'] != null) it.isShow = s[f + '_is_show'];
+        // 把平铺的 covervalue / prefix / suffix 挂到 it 上，和 front 统一取值
+        if (s[f + '_custom_covervalue'] != null) it.customCoverValue = s[f + '_custom_covervalue'];
+        if (s[f + '_custom_prefix'] != null) it.customPrefix = s[f + '_custom_prefix'];
+        if (s[f + '_custom_suffix'] != null) it.customSuffix = s[f + '_custom_suffix'];
+        var rt = s[f + '_custom_relatetag'];
+        if (rt != null) it.customRelateTag = rt;
+        arr.push(it);
+      });
+    }
+    arr.forEach(function (it) {
+      if (it.isShow != null && parseInt(it.isShow, 10) !== 1) return;
+      var nm = String(it.customName == null ? '' : it.customName).trim();
+      if (!nm || nm === '//') return;
+      var f = String(it.fieldBack || '').replace(/_custom_name$/, '');
+      // 手填值优先：covervalue 在 front 项上或平铺键上
+      var cov = it.customCoverValue != null ? it.customCoverValue : s[f + '_custom_covervalue'];
+      var hand = cov != null && String(cov).length > 0;
+      var vf = it.valueFront != null ? it.valueFront : s[f + '_custom_value'];
+      var raw = hand ? String(cov) : String(vf == null ? '' : vf);
+      if (!raw.trim()) return;
+      var pfx = hand ? '' : String(it.customPrefix == null ? '' : it.customPrefix);
+      var sfx = hand ? '' : String(it.customSuffix == null ? '' : it.customSuffix);
+      var val = pfx + raw + sfx;
+      // 关联 tag：front 用 customRelateTag，平铺用 f+'_custom_relatetag'
+      var rel = it.customRelateTag != null ? it.customRelateTag : s[f + '_custom_relatetag'];
+      var relIds = [];
+      if (Array.isArray(rel)) rel.forEach(function (x) { var id = parseInt(x, 10); if (id > 0 && relIds.indexOf(id) < 0) relIds.push(id); });
+      else if (rel != null) { var id1 = parseInt(rel, 10); if (id1 > 0) relIds.push(id1); }
+      // 替换符 tag（名称里的 {%id%}）
+      var phIds = [], mm, re = /\{%(\d+)%\}/g;
+      while ((mm = re.exec(nm)) !== null) { var tid = parseInt(mm[1], 10); if (tid > 0 && phIds.indexOf(tid) < 0) phIds.push(tid); }
+      var key = f + '|' + nm + '|' + val;
+      if (seen[key]) return;
+      seen[key] = 1;
+      out.push([nm, val, pfx, sfx, hand ? 1 : 0, relIds, phIds]);
+    });
     return out;
   }
 
@@ -77,7 +185,11 @@
       // 施法前摇（后台字段 ability_cast_point；注意 _back 后缀的是「施法后摇」）
       cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim(),
       // 最后更新时间（秒级 unix）→ 用于「今日更新」判定：id ≥ 20000 的自定义技能若今日更新过则不按自定义排除
-      ut: parseInt(x.update_time, 10) || 0
+      ut: parseInt(x.update_time, 10) || 0,
+      // 加成属性数据项（名称含 {%加成tag%} 且开启）；无则空数组
+      bx: bonusItems(x.ability_special_map),
+      // 数值数据项（所有自定义中文名 + 数值，供「数值检索」）；无则空数组
+      vx: valueItems(x.ability_special_map)
     };
   }
 

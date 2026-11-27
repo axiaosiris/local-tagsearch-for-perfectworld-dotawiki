@@ -84,15 +84,28 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(andBox.querySelectorAll('.rowitem').length === 4, '删除一行', andBox.querySelectorAll('.rowitem').length);
     ok(addBtn.disabled === false, '删除后「+ 添加」恢复可用');
 
-    // ---- 升级项列 ----
+    // ---- 升级项（2026-11-27 改版：不再单占一行、不再写「升级项」字样，与命中位置 chip 同行）----
     const upInp = doc.querySelector('.grp[data-k="and"] .rows input');
     upInp.value = '防御塔';
     upInp.dispatchEvent(new window.Event('input', { bubbles: true }));
     doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
-    const ths = Array.prototype.map.call(doc.querySelectorAll('#tblbox thead th'), (t) => t.textContent);
-    ok(ths[0] === '升级项', '「升级项」是第一列（技能列左侧）', ths.join(' / '));
-    const upChips = doc.querySelectorAll('#tblbox tbody td.upcell .up');
+    ok(!!doc.querySelector('#tblbox .skillgrid'), 'Tag 详细模式改用等宽技能卡片网格');
+    ok(!doc.querySelector('#tblbox .skillcard .tagup') &&
+      !/升级项/.test(doc.getElementById('tblbox').textContent), '卡片内不再出现「升级项」字样与其独立区块');
+    // ---- 2026-11-27：tags 字段维度整体移除（后台数据过时）----
+    const scLabels = Array.prototype.slice.call(doc.querySelectorAll('.scope label'));
+    ok(scLabels.length === 3 && !doc.getElementById('scG'),
+      '匹配范围只剩 技能类型/技能效果/技能特性 三项（tags 字段已移除）', scLabels.length);
+    ok(!/tags\s*字段/.test(doc.getElementById('tblbox').textContent),
+      '结果卡片里不再出现「tags字段」命中位置提示');
+    const upChips = doc.querySelectorAll('#tblbox .skillcard .tagitems .ups.inl .up');
     ok(upChips.length > 0, '带升级项的技能渲染出 chip', upChips.length);
+    // 升级项 chip 与命中位置 chip 在同一行容器内，且排在其前面
+    const upRow = upChips[0] && upChips[0].closest('.tagitems');
+    ok(!!upRow && !!upRow.querySelector('.chip'), '升级项与命中位置 chip 处于同一行容器',
+      upRow ? Array.prototype.map.call(upRow.children, (e) => e.className.split(' ')[0]).join(',') : '无');
+    ok(!!upRow && !!(upRow.firstElementChild.compareDocumentPosition(upRow.querySelector('.chip')) & 4),
+      '升级项 chip 排在命中位置 chip 之前');
     // 每个 chip = 上图标（img 或色块）+ 下占位符文本
     const firstChip = upChips[0];
     const ico = firstChip.querySelector('.ico');
@@ -111,9 +124,10 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(allImg.every((c) => /^icons\/\d+\.png$/.test(c.querySelector('img.ico').getAttribute('src'))),
       '图标指向本地 icons/<id>.png', allImg.length + ' 个（其余为纯色块）');
     const noUp = Array.prototype.filter.call(
-      doc.querySelectorAll('#tblbox tbody td.upcell'),
-      (td) => td.querySelectorAll('.up').length === 0);
-    ok(noUp.every((td) => td.textContent.trim() === '—'), '无升级项的技能显示「—」', noUp.length + ' 行');
+      doc.querySelectorAll('#tblbox .skillcard'),
+      (card) => !card.querySelector('.ups.inl'));
+    ok(noUp.every((card) => !card.querySelector('.ups') && !/升级项/.test(card.textContent)),
+      '无升级项的技能不渲染升级项 chip', noUp.length + ' 张卡片');
 
     // ---- 默认排除：废弃 / 自定义 / 公式残条 ----
     const showEx = doc.getElementById('showEx');
@@ -142,10 +156,10 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     showEx.dispatchEvent(new window.Event('change', { bubbles: true }));
     const nAll = +doc.getElementById('nHit').textContent;
     ok(nAll > nDefault, '勾选「包含被排除项」后命中数增加', nDefault + ' → ' + nAll);
-    const exRows = doc.querySelectorAll('#tblbox tbody tr.ex');
-    ok(exRows.length > 0, '被排除的行带 .ex 类（灰显）', exRows.length + ' 行');
-    ok(doc.querySelectorAll('#tblbox tbody .xmark').length === exRows.length,
-      '被排除行均带原因标记', doc.querySelectorAll('#tblbox tbody .xmark').length);
+    const exRows = doc.querySelectorAll('#tblbox .skillcard.ex');
+    ok(exRows.length > 0, '被排除的卡片带 .ex 类（灰显）', exRows.length + ' 张');
+    ok(doc.querySelectorAll('#tblbox .skillcard .xmark').length === exRows.length,
+      '被排除卡片均带原因标记', doc.querySelectorAll('#tblbox .skillcard .xmark').length);
     const ib2 = (doc.querySelector('.infobox') || {}).textContent || '';
     ok(/已包含/.test(ib2), '勾选后提示切换为「已包含」', ib2.replace(/\s+/g, ' ').slice(0, 50));
 
@@ -153,8 +167,8 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     showEx.dispatchEvent(new window.Event('change', { bubbles: true }));
     ok(+doc.getElementById('nHit').textContent === nDefault, '取消勾选后恢复默认命中数',
       doc.getElementById('nHit').textContent + ' vs ' + nDefault);
-    ok(doc.querySelectorAll('#tblbox tbody tr.ex').length === 0, '取消勾选后无灰显行',
-      doc.querySelectorAll('#tblbox tbody tr.ex').length);
+    ok(doc.querySelectorAll('#tblbox .skillcard.ex').length === 0, '取消勾选后无灰显卡片',
+      doc.querySelectorAll('#tblbox .skillcard.ex').length);
 
     // ---- 简/详 展示切换 ----
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
@@ -165,15 +179,16 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
 
     const btnView = doc.getElementById('btnView');
     ok(!!btnView, '结果区上方存在「简/详」切换按钮', btnView && btnView.textContent.trim());
-    ok(doc.querySelectorAll('#tblbox table').length === 1 && !doc.querySelector('#tblbox table.cmp'),
-      '默认是详细展示（表格无 .cmp 类）');
-    const fullTds = doc.querySelectorAll('#tblbox tbody tr')[0].querySelectorAll('td').length;
-    ok(fullTds === 7, '详细模式每行 7 列（升级项/技能/ID/施法前摇/命中详情/tag 数/详情）', fullTds);
+    ok(doc.querySelectorAll('#tblbox .skillgrid').length === 1 && !doc.querySelector('#tblbox .cmpgrid'),
+      '默认是详细展示（等宽技能卡片网格）');
+    ok(doc.querySelectorAll('#tblbox .skillcard [data-detail]').length > 0, '详细卡片保留「详情」按钮');
+    ok(!/tag 数/.test(doc.getElementById('tblbox').textContent), '详细卡片不再显示 tag 数');
+    ok(!/施法前摇/.test(doc.getElementById('tblbox').textContent), '未填前摇条件时不显示前摇段');
 
     btnView.dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(doc.querySelectorAll('#tblbox .cmpgrid').length === 1 && !doc.querySelector('#tblbox thead'),
-      '切换后进入简洁展示（.cmpgrid 且无表头）');
-    ok(doc.querySelectorAll('#tblbox table').length === 0, '简洁模式不再是「一行一个技能」的表格');
+    ok(doc.querySelectorAll('#tblbox .cmpgrid').length === 1 && !doc.querySelector('#tblbox .skillgrid'),
+      '切换后进入简洁展示（.cmpgrid，无卡片网格）');
+    ok(doc.querySelectorAll('#tblbox .skillcard').length === 0, '简洁模式不再使用技能卡片');
     const cItems = doc.querySelectorAll('#tblbox .cmpgrid > .cmitem');
     ok(cItems.length > 0, '简洁模式有技能块', cItems.length + ' 块');
     // 每块都必须同时含「升级项」与「技能名」——两者绑在同一个元素里，换行时整体一起换行
@@ -207,10 +222,38 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
 
     btnView.dispatchEvent(new window.Event('click', { bubbles: true }));
     ok(doc.querySelectorAll('#tblbox .cmpgrid').length === 0 &&
-      doc.querySelectorAll('#tblbox table').length === 1 && !!doc.querySelector('#tblbox thead'),
+      doc.querySelectorAll('#tblbox .skillgrid').length === 1 && !!doc.querySelector('#tblbox .skillcard [data-detail]'),
       '再点一次复原为详细展示');
     ok(/简洁展示/.test(btnView.textContent), '按钮文案复原为「简洁展示」', btnView.textContent.trim());
     ok(!btnView.classList.contains('on'), '复原后按钮取消激活态');
+
+    // ---- Tag 结果只显示效果位置；升级项仅在前后效果 tag 有差异时展示 ----
+    const runTagQ = (q) => {
+      doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+      const el = doc.querySelector('.grp[data-k="and"] .rows input');
+      el.value = q;
+      el.dispatchEvent(new window.Event('input', { bubbles: true }));
+      doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    };
+    const cardOf = (nm) => Array.prototype.find.call(doc.querySelectorAll('#tblbox .skillcard'),
+      (c) => ((c.querySelector('.scnm') || {}).textContent || '').indexOf(nm) >= 0);
+
+    runTagQ('百分比护甲穿透');
+    const tide = cardOf('潮汐使者');
+    ok(!!tide, '检索「百分比护甲穿透」命中潮汐使者');
+    ok(/效果5「潮汐使者护甲穿透」/.test(tide.querySelector('.tagitems').textContent),
+      '卡片只显示 效果5「潮汐使者护甲穿透」', tide.querySelector('.tagitems').textContent.trim());
+    ok(!/百分比护甲穿透/.test(tide.querySelector('.tagitems').textContent),
+      '结果卡片不重复显示被检索的 tag 名');
+    ok(!tide.querySelector('.ups'), '潮汐使者：该效果只有一个版本 → 不显示升级项');
+
+    runTagQ('无敌');
+    const astral = cardOf('星体禁锢');
+    ok(!!astral, '检索「无敌」命中星体禁锢');
+    ok(/效果2「星体禁锢（友方）」/.test(astral.querySelector('.tagitems').textContent),
+      '卡片只显示 效果2「星体禁锢（友方）」', astral.querySelector('.tagitems').textContent.trim());
+    ok(!!astral.querySelector('.tagitems .ups.inl') && /魔晶/.test(astral.querySelector('.tagitems .ups.inl').textContent),
+      '星体禁锢：只有魔晶升级才有无敌 → 显示升级项');
 
     // ---- 清空 ----
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
@@ -224,16 +267,33 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
     ok(+doc.getElementById('nHit').textContent > 0, '检索「幻象不继承」有命中',
       doc.getElementById('nHit').textContent);
-    const featEls = doc.querySelectorAll('#tblbox tbody .chip .feat');
-    ok(featEls.length > 0, '详细模式在命中技能特性的 chip 内展示特性内容', featEls.length + ' 条');
-    ok(doc.querySelectorAll('#tblbox tbody .chip .feat b').length === featEls.length,
+    const featEls = doc.querySelectorAll('#tblbox .skillcard .chip .feat');
+    ok(featEls.length > 0, '详细卡片在命中技能特性的 chip 内展示特性内容', featEls.length + ' 条');
+    ok(doc.querySelectorAll('#tblbox .skillcard .chip .feat b').length === featEls.length,
       '每条特性内容前都带特性名（<b>）');
     const featTxt = featEls[0].textContent.trim();
     ok(featTxt.length > 8 && /本技能/.test(featTxt), '特性内容为完整描述句',
       JSON.stringify(featTxt.slice(0, 36)));
-    ok(/@ 技能特性/.test(featEls[0].closest('.chip').textContent), 'chip 仍保留命中位置提示（@ 技能特性）');
+    ok(/^技能特性/.test(featEls[0].closest('.chip').textContent.trim()), 'chip 只显示命中位置（技能特性），不重复 tag 名');
 
-    doc.querySelector('#tblbox tbody [data-detail]').dispatchEvent(new window.Event('click', { bubbles: true }));
+    // ---- 命中数下方重述检索条件 ----
+    const qc = doc.getElementById('qCond');
+    ok(qc.style.display !== 'none' && /包含【幻象不继承】/.test(qc.textContent),
+      '命中数下方显示「包含【…】」条件', qc.textContent);
+    const qOr = doc.querySelector('.grp[data-k="or"] .rows input');
+    qOr.value = '治疗';
+    qOr.dispatchEvent(new window.Event('input', { bubbles: true }));
+    const qNot = doc.querySelector('.grp[data-k="not"] .rows input');
+    qNot.value = '无敌';
+    qNot.dispatchEvent(new window.Event('input', { bubbles: true }));
+    doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(/包含【幻象不继承】；至少包含【治疗】；排除【无敌】/.test(qc.textContent),
+      '条件行按「包含 / 至少包含 / 排除」顺序重述', qc.textContent);
+    qNot.value = ''; qOr.value = '';
+    qNot.dispatchEvent(new window.Event('input', { bubbles: true }));
+    qOr.dispatchEvent(new window.Event('input', { bubbles: true }));
+
+    doc.querySelector('#tblbox .skillcard [data-detail]').dispatchEvent(new window.Event('click', { bubbles: true }));
     const mbody = doc.getElementById('mBody').textContent;
     ok(/技能特性（机制项）/.test(mbody), '详情面板含「技能特性（机制项）」区');
     ok(doc.querySelectorAll('#mBody .feattext').length > 0, '详情面板同样展示特性内容',
@@ -241,9 +301,9 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     doc.getElementById('mClose').dispatchEvent(new window.Event('click', { bubbles: true }));
 
     btnView.dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(doc.querySelectorAll('#tblbox .cmpgrid .feat').length === 0, '简洁模式不展示特性内容（仍只有图标+技能名）');
+    ok(doc.querySelectorAll('#tblbox .cmpgrid .chip .feat').length === 0, '简洁模式不展示特性内容（仍只有图标+技能名）');
     btnView.dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(doc.querySelectorAll('#tblbox tbody .chip .feat').length > 0, '切回详细模式后特性内容恢复显示');
+    ok(doc.querySelectorAll('#tblbox .skillcard .chip .feat').length > 0, '切回详细模式后特性内容恢复显示');
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
 
     // ---- 更新本地数据：入口与钩子 ----
@@ -253,6 +313,8 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     updBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
     ok(doc.getElementById('updMask').classList.contains('on'), '点击按钮打开更新面板');
     ok(!!window.__tagsearch && typeof window.__tagsearch.loadFromText === 'function', '暴露调试钩子 __tagsearch');
+    ok(!doc.getElementById('updRun') && !/方式三/.test(doc.getElementById('updMask').textContent),
+      '更新面板只剩方式一 / 方式二（方式三「本机服务一键更新」已删除）');
 
     // ---- 载入 _raw.json 内容：转换 + 应用 ----
     const raw = {
@@ -262,8 +324,34 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
       abilities: [{ i: 9001, n: '测试技能', en: 'test', d: [844], g: [], m: [], e: [{ n: '', t: [488] }] }]
     };
     window.__tagsearch.loadFromText(JSON.stringify(raw), '_raw.json');
-    ok(doc.getElementById('mAbs').textContent === '1', '_raw.json 载入后技能数更新为 1', doc.getElementById('mAbs').textContent);
-    ok(doc.getElementById('mTags').textContent === '2', '载入后 tag 数更新为 2', doc.getElementById('mTags').textContent);
+    ok(doc.getElementById('mTime').textContent !== '—', '_raw.json 载入后页头显示快照时间',
+      doc.getElementById('mTime').textContent);
+    ok(!doc.getElementById('mAbs') && !doc.getElementById('mTags') && !doc.getElementById('mNotes') &&
+      !doc.getElementById('mDup'), '页头统计只保留快照时间（tag/技能/英雄/注释/同名 已去掉）');
+    // 页头右上：截图（预留）+ 更新本地图标 + 更新本地数据
+    const hdIds = Array.prototype.map.call(
+      doc.querySelectorAll('.hdact .btn'), (b) => b.id);
+    ok(hdIds.join(',') === 'btnShot,btnIcon,btnUpdate', '右上三个按钮顺序：截图 / 更新本地图标 / 更新本地数据',
+      hdIds.join(','));
+    doc.getElementById('btnIcon').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(doc.getElementById('icoMask').classList.contains('on'), '点「更新本地图标」打开教程弹窗');
+    ok(/icons/.test(doc.getElementById('icoMask').textContent), '教程说明把图标复制进 icons 文件夹');
+    ok(/spellicons/.test(doc.getElementById('icoMask').textContent) &&
+      /other_icons/.test(doc.getElementById('icoMask').textContent), '教程列出各图标子目录');
+    doc.getElementById('icoClose').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(!doc.getElementById('icoMask').classList.contains('on'), '教程弹窗可关闭');
+    doc.getElementById('btnShot').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(doc.getElementById('toast').classList.contains('on') &&
+      /先检索一次/.test(doc.getElementById('toast').textContent), '未检索时点「截图」提示先检索',
+      doc.getElementById('toast').textContent);
+    // 截图文件名规则：包含A、B_至少包含C_排除D_YYYY-MM-DD_HHmm.png（没有的组忽略）
+    var nm = window.__tagsearch.shotName({ and: ['缠绕', '缴械'], or: ['沉默'], not: ['锁闭'] });
+    ok(/^包含缠绕、缴械_至少包含沉默_排除锁闭_\d{4}-\d{2}-\d{2}_\d{4}\.png$/.test(nm),
+      '截图文件名按「包含_至少包含_排除_时间(到分)」拼装', nm);
+    var nm2 = window.__tagsearch.shotName({ and: ['缠绕'], or: [], not: [] });
+    ok(/^包含缠绕_\d{4}-\d{2}-\d{2}_\d{4}\.png$/.test(nm2), '没有的筛选条件忽略', nm2);
+    var nm3 = window.__tagsearch.shotName(null);
+    ok(/^\d{4}-\d{2}-\d{2}_\d{4}\.png$/.test(nm3), '无条件时只留时间', nm3);
     ok(new RegExp('已载入数据').test(doc.getElementById('updLog').textContent), '日志记录载入成功');
 
     // 载入后检索仍可用（新数据生效）
@@ -294,8 +382,8 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
       ]
     };
     window.__tagsearch.applyDb(noteDb, '合成测试数据');
-    ok(/行 \/ 3 技能/.test(doc.getElementById('mNotes').textContent), '页头显示注释数据量（行池 / 技能数）',
-      doc.getElementById('mNotes').textContent);
+    ok(doc.getElementById('mTime').textContent !== '—', '页头只剩快照时间（不再显示注释行数）',
+      doc.getElementById('mTime').textContent);
 
     // Tag 模式先留一份结果（用于验证「互不影响」）
     const tagInp2 = doc.querySelector('.grp[data-k="and"] .rows input');
@@ -320,6 +408,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     // 检索
     const q = doc.getElementById('noteQ');
     ok(!!q, '存在注释输入框');
+    ok(doc.getElementById('btnRunN').textContent.trim() === '确认检索', '注释面板有「确认检索」按钮');
     q.value = '粘滞';
     doc.getElementById('btnRunN').dispatchEvent(new window.Event('click', { bubbles: true }));
     ok(+doc.getElementById('nHit').textContent === 2, '注释检索「粘滞」命中 2 个技能',
@@ -332,8 +421,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     const marks = doc.querySelectorAll('#tblbox tbody mark');
     ok(marks.length >= 2 && /粘滞/.test(marks[0].textContent), '命中关键词标黄', marks.length + ' 处');
     ok(doc.querySelectorAll('#tblbox tbody .xmark').length === 0, '默认不含被排除项时无原因标记');
-    const cnt0 = doc.querySelector('#tblbox tbody td.count').textContent;
-    ok(/^\d+\/\d+$/.test(cnt0.trim()), '显示「命中行数 / 注释总行数」', cnt0);
+    ok(!doc.querySelector('#tblbox tbody td.count'), '注释结果表已无「命中」列（命中行数 / 总行数）');
 
     // 多词 AND
     q.value = '粘滞 层数';
@@ -359,22 +447,20 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(allLis[1].style.paddingLeft === '14px', '缩进层级体现在行内边距', allLis[1].style.paddingLeft || '(无)');
     doc.getElementById('mClose').dispatchEvent(new window.Event('click', { bubbles: true }));
 
-    // 简洁模式（注释模式共用简/详）
-    btnView.dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(doc.querySelectorAll('#tblbox .cmpgrid').length === 1 &&
-      doc.querySelectorAll('#tblbox .nline').length === 0, '注释模式也支持简洁展示（仅图标 + 技能名）');
-    ok(doc.querySelectorAll('#tblbox .cmpgrid .cname').length === 2, '简洁模式列出全部命中技能',
-      doc.querySelectorAll('#tblbox .cmpgrid .cname').length);
-    btnView.dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(doc.querySelectorAll('#tblbox tbody .nline').length > 0, '切回详细后注释命中行恢复');
+    // 注释模式固定详细展示，不提供简/详按钮；结果表无「命中」列
+    ok(doc.getElementById('btnView').style.display === 'none', '注释模式隐藏「简/详」按钮',
+      doc.getElementById('btnView').style.display);
+    const noteThs = Array.prototype.map.call(doc.querySelectorAll('#tblbox thead th'), (t) => t.textContent.trim());
+    ok(noteThs.length === 5 && !noteThs.includes('命中'), '注释模式结果表固定 5 列且无「命中」列',
+      noteThs.join(' / '));
+    ok(doc.querySelectorAll('#tblbox tbody .nline').length > 0, '注释命中行仍在详细表格中');
 
     // 互不影响：切回 Tag 模式应还原之前的 Tag 结果
     mTag.dispatchEvent(new window.Event('click', { bubbles: true }));
     ok(+doc.getElementById('nHit').textContent === nTag, '切回 Tag 模式还原原结果（不受注释检索影响）',
       doc.getElementById('nHit').textContent + ' vs ' + nTag);
-    const tThs = Array.prototype.map.call(doc.querySelectorAll('#tblbox thead th'), (t) => t.textContent);
-    ok(tThs.includes('命中详情') && !tThs.includes('命中行（注释原文）'), 'Tag 模式表头仍为「命中详情」', tThs.join(' / '));
-    ok(doc.querySelectorAll('#tblbox .nline').length === 0, 'Tag 模式不残留注释行');
+    ok(!!doc.querySelector('#tblbox .skillcard .chip') && !doc.querySelector('#tblbox .nline'),
+      'Tag 模式恢复详细卡片命中 chip，不残留注释行');
 
     mNote.dispatchEvent(new window.Event('click', { bubbles: true }));
     ok(+doc.getElementById('nHit').textContent === 2, '再切回注释模式还原注释结果',
@@ -394,8 +480,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     mNote.dispatchEvent(new window.Event('click', { bubbles: true }));
     ok(/不含注释内容/.test(doc.getElementById('noteWarn').textContent), '数据无注释时提示重新抓取',
       doc.getElementById('noteWarn').textContent.trim().slice(0, 30));
-    ok(doc.getElementById('mNotes').textContent === '无', '页头注释数显示「无」',
-      doc.getElementById('mNotes').textContent);
+    ok(!doc.getElementById('mNotes'), '页头不再显示注释统计');
 
     // ================= 施法前摇筛选（可与 tag 条件同时使用） =================
     const cpDb = {
@@ -423,7 +508,7 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     const tagInp3 = doc.querySelector('.grp[data-k="and"] .rows input');
     const runBtn = doc.getElementById('btnRun');
     const cpNames = () => Array.prototype.map.call(
-      doc.querySelectorAll('#tblbox tbody td.nm'), (e) => e.textContent.replace(/[#\d]/g, '').replace(/[a-z_]+$/, '').trim());
+      doc.querySelectorAll('#tblbox .skillcard .scnm'), (e) => e.textContent.replace(/[#\d]/g, '').replace(/[a-z_]+$/, '').trim());
 
     // ① 0~0 = 恰为 0（含「0（魔晶）」这种带备注的写法），排除 0.2 / 0.15 / 无数据
     tagInp3.value = '治疗';
@@ -442,10 +527,10 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     ok(+doc.getElementById('nHit').textContent === 3, '「0~0.15」含端点 0.15（3 个）',
       doc.getElementById('nHit').textContent);
 
-    // ③ 表头有「施法前摇」列且显示原值
-    ok(/施法前摇/.test(doc.querySelector('#tblbox thead').textContent), '详细表新增「施法前摇」列');
-    const cpCells = Array.prototype.map.call(doc.querySelectorAll('#tblbox tbody td.cpcell'), (e) => e.textContent.trim());
-    ok(cpCells.includes('0.15'), '前摇列显示后台原值', cpCells.join(' / '));
+    // ③ 卡片显示「施法前摇」段且保留后台原值
+    ok(/施法前摇/.test(doc.getElementById('tblbox').textContent), '详细卡片新增「施法前摇」段');
+    const cpCells = Array.prototype.map.call(doc.querySelectorAll('#tblbox .skillcard .cpcell'), (e) => e.textContent.trim());
+    ok(cpCells.some((s) => s.indexOf('0.15') === 0), '前摇段显示后台原值', cpCells.join(' / '));
 
     // ④ 无数据技能被排除并提示数量
     ok(/无施法前摇数据/.test(doc.getElementById('tblbox').textContent), '提示「无施法前摇数据」被排除的数量');
@@ -581,8 +666,8 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
       '「A 在效果1、B 在效果2」不再算命中');
     ok(/效果类 tag 同一效果条目/.test(doc.getElementById('tblbox').textContent) &&
        /分散/.test(doc.getElementById('tblbox').textContent), '结果区说明有多少条因条件分散未命中');
-    const uChips = doc.querySelectorAll('#tblbox .chip.unit');
-    ok(uChips.length === 1 && /效果1/.test(uChips[0].textContent), '命中行标注命中效果条目（效果1）',
+    const uChips = doc.querySelectorAll('#tblbox .tagitems .chip');
+    ok(uChips.length >= 1 && /效果1/.test(uChips[0].textContent), '命中卡片标注命中效果条目（效果1）',
       uChips.length ? uChips[0].textContent.trim() : '(无)');
     ok(/效果类同一条目/.test(doc.getElementById('expr').textContent), '「当前条件」标明匹配粒度',
       doc.getElementById('expr').textContent.replace(/\s+/g, ' ').trim());
@@ -854,8 +939,9 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
     doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
     ok(+doc.getElementById('nHit').textContent === 3, '不带类别 → 两种含义全匹配（含神杖档，3 条）',
       doc.getElementById('nHit').textContent);
-    ok(doc.querySelectorAll('#tblbox .chip .cat.amb').length === 3, '结果行标出「共 N 种含义」',
-      doc.querySelectorAll('#tblbox .chip .cat.amb').length);
+    const ambItems = doc.querySelector('#tblbox .skillcard .tagitems').textContent;
+    ok(!/测试光环/.test(ambItems) && /效果/.test(ambItems), '结果卡片只显示效果位置，不再重复 tag 名/多义类别',
+      ambItems.replace(/\s+/g, ' ').trim().slice(0, 60));
     ok(/同名含义/.test(doc.getElementById('tblbox').textContent), '结果区给出多义说明');
 
     // 写成「名称（类别）」→ 只匹配该类别
@@ -887,23 +973,298 @@ JSDOM.fromFile(FILE, { runScripts: 'dangerously', resources: 'usable', pretendTo
       doc.querySelectorAll('#mBody .chip .cat').length);
     doc.getElementById('mClose').dispatchEvent(new window.Event('click', { bubbles: true }));
 
-    // 同名一览弹窗：能列出同名 tag、点含义直接填入
+    // 同名 tag 一览入口已移除（2026-11-27 用户定：不需要）
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(/\d+ 组（多义 \d+）/.test(doc.getElementById('mDup').textContent), '元信息显示同名 tag 组数（含跨类别数）',
-      doc.getElementById('mDup').textContent);
-    doc.getElementById('mDup').dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(doc.getElementById('mask').classList.contains('on'), '点「同名 N」打开一览弹窗');
-    ok(/同名 tag/.test(doc.getElementById('mTitle').textContent), '弹窗标题说明是同名 tag',
-      doc.getElementById('mTitle').textContent);
-    ok(doc.querySelectorAll('#mBody .duptag').length >= 2, '弹窗列出该名的全部含义',
-      doc.querySelectorAll('#mBody .duptag').length);
-    const dupBtn = doc.querySelector('#mBody .duptag[data-fill]');
-    dupBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
-    ok(!doc.getElementById('mask').classList.contains('on'), '点含义后关闭弹窗');
-    ok(andIn()[0].value === dupBtn.getAttribute('data-fill'), '点含义后填入「且」条件',
-      andIn()[0].value);
+    ok(!doc.getElementById('btnDup'), '不再提供「同名 tag 一览」入口');
+    ok(!/同名/.test(doc.querySelector('header .meta').textContent), '页头不再出现同名统计');
 
+    // ================= 加成检索（第三模式，2026-11-23） =================
+    // 上一段注入的合成数据没有加成 tag → 此处单独注入一份含 7 个加成 tag 的合成数据
+    window.__tagsearch.applyDb({
+      fetchedAt: '2026-11-23T00:00:00.000Z',
+      tags: [
+        { id: 1156, name: '受施法距离加成影响', c1: '图标', c2: '加成属性' },
+        { id: 1157, name: '不受施法距离加成影响', c1: '图标', c2: '加成属性' },
+        { id: 1158, name: '受攻击距离加成影响', c1: '图标', c2: '加成属性' },
+        { id: 1159, name: '不受攻击距离加成影响', c1: '图标', c2: '加成属性' },
+        { id: 1160, name: '受作用范围加成影响', c1: '图标', c2: '加成属性' },
+        { id: 1161, name: '不受作用范围加成影响', c1: '图标', c2: '加成属性' },
+        { id: 1334, name: '物品威力', c1: '图标', c2: '加成属性' }
+      ],
+      notePool: [], heroes: [{ i: 1, zh: '敌法师', en: 'antimage', a: '敏捷' }],
+      imgMap: {
+        7710: { s: 'icons/abilities/void_spirit_resonant_pulse.png', u: 'icons/heroes/antimage.png' },
+        7712: { s: 'icons/abilities/entangle.png', u: '' },
+        5122: { s: 'icons/abilities/magic_arrow.png', u: '' },
+        // 物品技能在 imgMap 里带 'item:' 前缀（与英雄技能同 id 时不互相覆盖）
+        'item:302': { s: 'icons/items/vile_phial.png', u: '' }
+      },
+      abilities: [
+        { i: 7710, n: '共鸣脉冲', en: 'void_spirit_resonant_pulse', h: [1], d: [], g: [], m: [], e: [],
+          bx: [['脉冲作用范围{%1160%}', [1160]]],
+          vx: [['脉冲作用范围{%1160%}', '375', '', '', 0, [], [1160]]] },
+        { i: 7712, n: '缠绕', en: 'entangle', d: [1046], g: [], m: [], e: [],
+          bx: [['缠绕持续时间{%1160%}{%1046%}', [1160]]],
+          vx: [['缠绕持续时间{%1160%}{%1046%}', '325', '', '', 0, [], [1160]]] },
+        { i: 5122, n: '魔法箭', en: 'magic_arrow', d: [1047], g: [], m: [], e: [],
+          bx: [['弹射距离百分比{%1047%}{%1156%}{%1161%}', [1156, 1161]]],
+          vx: [['弹射距离百分比{%1047%}{%1156%}{%1161%}', '50%', '', '%', 0, [], [1156, 1161]]] },
+        { i: 7711, n: '范围外技能', en: 'no_bonus', d: [], g: [], m: [], e: [], bx: [] },
+        { i: 302, n: '破法（净魂之刃）', en: 'mana_break', src: 'item', d: [], g: [], m: [], e: [],
+          bx: [['每次燃烧魔法{%1334%}', [1334]]],
+          vx: [['每次燃烧魔法{%1334%}', '30%', '', '%', 0, [], [1334]]] }
+      ]
+    }, '合成测试数据（加成检索）');
+
+    const mBtns = Array.prototype.slice.call(doc.querySelectorAll('#modes .mbtn'));
+    ok(mBtns.length === 4 && mBtns.some((b) => b.getAttribute('data-mode') === 'bonus') &&
+       mBtns.some((b) => b.getAttribute('data-mode') === 'value'),
+      '页头有四个模式按钮（含加成检索、数值检索）', mBtns.length);
+    ok(!!doc.getElementById('paneBonus'), '左栏存在加成检索面板');
+    const bRadios = Array.prototype.slice.call(doc.querySelectorAll('input[name="bonusTag"]'));
+    ok(bRadios.length === 7, '加成面板列出 7 个 tag 单选', bRadios.length);
+    ok(bRadios.some((r) => r.value === '1160'), '包含「受作用范围加成影响」(1160)');
+
+    window.__tagsearch.setMode('bonus');
+    ok(doc.getElementById('paneBonus').style.display !== 'none', '切到加成模式 → 显示加成面板');
+    ok(doc.getElementById('paneNote').style.display === 'none', '切到加成模式 → 注释面板隐藏');
+    ok(doc.getElementById('btnView').style.display === 'none', '加成模式隐藏「简/详」按钮');
+    ok(mBtns.filter((b) => b.getAttribute('data-mode') === 'bonus')[0].classList.contains('on'),
+      '「加成检索」按钮高亮');
+
+    ok(window.__tagsearch.setBonusTag(1160) === true, 'setBonusTag(1160) 选中成功');
+    const nB = +doc.getElementById('nHit').textContent;
+    ok(nB > 0, '加成检索命中 > 0', nB);
+    const bBox = doc.getElementById('tblbox').textContent;
+    ok(/脉冲作用范围/.test(bBox), '结果含「脉冲作用范围」');
+    const bItems = doc.querySelector('#tblbox .scitems').textContent;
+    ok(!/\{%1160%\}/.test(bItems), '加成检索不展示加成替换符 {%1160%}');
+    ok(/受作用范围加成影响/.test(bBox), '结果说明含 tag 名');
+    ok(/脉冲作用范围: 375/.test(bBox), '中文名与数值之间是冒号（脉冲作用范围: 375）');
+    ok(/缠绕持续时间神杖: 325/.test(bBox), '升级项就地替换在中文名里（缠绕持续时间 + 神杖）');
+    ok(doc.querySelectorAll('#tblbox .scit .upinline').length === 1, '升级项渲染为条目内 inline chip');
+    ok(!doc.querySelectorAll('#tblbox .scup').length, '升级项不再堆在全部条目之前');
+    ok(!/\{%1046%\}/.test(bBox), '升级占位符原文不展示');
+    ok(doc.querySelectorAll('#tblbox .skillcard').length === 2, '加成检索使用等宽技能卡片展示');
+    ok(doc.querySelectorAll('#tblbox img.scpic').length === 2, 'imgMap 命中 → 主体显示技能图标');
+    ok(doc.querySelectorAll('#tblbox .scpic.ph').length === 0, '有图标时不再显示占位块');
+    ok(doc.querySelectorAll('#tblbox .schd img.schico').length === 1, '英雄技能显示单位小图标');
+    ok(!doc.querySelectorAll('#tblbox thead th').length, '加成检索不再使用表头');
+    ok(doc.getElementById('btnRunB').textContent.trim() === '确认检索', '加成面板有「确认检索」按钮');
+    doc.getElementById('btnRunB').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === nB, '点击「确认检索」重新执行搜索，结果一致');
+
+    // 同一项含多个加成替换符：全部去掉，只保留升级 chip（魔法箭 1047/1156/1161）
+    ok(window.__tagsearch.setBonusTag(1156) === true, 'setBonusTag(1156) 选中成功');
+    const b1156 = doc.getElementById('tblbox');
+    ok(/弹射距离百分比魔晶: 50%/.test(b1156.textContent), '魔法箭：仅保留中文名 + 魔晶 chip + 数值');
+    ok(!/\{%1156%\}/.test(b1156.querySelector('.scitems').textContent), '不展示被检索的 {%1156%}');
+    ok(!/\{%1161%\}/.test(b1156.querySelector('.scitems').textContent), '同项其他加成替换符 {%1161%} 也不展示');
+    ok(b1156.querySelectorAll('.scit .upinline').length === 1, '1047 就地换成魔晶 chip');
+    ok(window.__tagsearch.setBonusTag(1160) === true, '切回 1160 供后续断言');
+    ok(!!doc.querySelector('input[name="bonusTag"][value="1160"]').checked, '1160 保持选中');
+    ok(doc.querySelectorAll('#bonusTags label.on').length === 1, '选中项高亮 1 个');
+
+    window.__tagsearch.setMode('tag');
+    ok(doc.getElementById('paneBonus').style.display === 'none', '切回 Tag 模式 → 加成面板隐藏');
+    window.__tagsearch.setMode('bonus');
+    ok(+doc.getElementById('nHit').textContent === nB, '切回来加成结果保留',
+      doc.getElementById('nHit').textContent);
+
+    // 物品威力（1334）：物品技能无 is_show 字段，也须能被检索到
+    ok(window.__tagsearch.setBonusTag(1334) === true, 'setBonusTag(1334) 选中成功');
+    ok(+doc.getElementById('nHit').textContent === 1, '物品威力命中 1 条（破法）',
+      doc.getElementById('nHit').textContent);
+    ok(/每次燃烧魔法: 30%/.test(doc.getElementById('tblbox').textContent),
+      '结果含「每次燃烧魔法: 30%」（替换符不展示、冒号分隔）');
+    ok(/破法（净魂之刃）/.test(doc.getElementById('tblbox').textContent), '结果含技能名「破法（净魂之刃）」');
+    ok(/30%/.test(doc.getElementById('tblbox').textContent), '物品技能加成项也显示数值');
+    ok(doc.querySelectorAll('#tblbox img.scpic[src="icons/items/vile_phial.png"]').length === 1,
+      '物品技能显示物品图标');
+    ok(doc.querySelectorAll('#tblbox .schd .schico').length === 0,
+      '物品技能不显示单位小图标，也不留占位空格');
+
+    doc.getElementById('btnClearB').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 0, '清空加成条件 → 0 命中');
+    ok(doc.querySelectorAll('input[name="bonusTag"]:checked').length === 0, '清空后无选中 radio');
+
+    // ================= 数值检索（第四模式，2026-11-27） =================
+    window.__tagsearch.applyDb({
+      fetchedAt: '2026-11-27T00:00:00.000Z',
+      tags: [
+        { id: 385, name: '伤害', c1: '机制', c2: '包含效果' },
+        { id: 490, name: '生命恢复增强', c1: '机制', c2: '包含效果' },
+        { id: 1160, name: '受作用范围加成影响', c1: '图标', c2: '加成属性' },
+        { id: 1326, name: '物品威力', c1: '机制', c2: '包含效果' },
+        { id: 1334, name: '物品威力', c1: '图标', c2: '加成属性' }
+      ],
+      notePool: [], heroes: [],
+      abilities: [
+        { i: 1310, n: '黑暗之心', en: 'heart', d: [], g: [], m: [], e: [],
+          vx: [
+            ['白天生命回复', '-20%', '-', '%', 0, [490], []],
+            ['最高伤害', '120/200/280/360', '', '', 0, [385], []],
+            ['作用范围{%1160%}', '375', '', '', 0, [], [1160]]
+          ] },
+        { i: 999, n: '泉水回春', en: 'fountain', d: [], g: [], m: [], e: [],
+          vx: [['每秒恢复最大生命值', '5', '', '', 1, [490], []]] },
+        { i: 1000, n: '背刺', en: 'backstab', d: [], g: [], m: [], e: [],
+          vx: [['额外物品威力', '10%', '', '', 0, [1326], []]] }
+      ]
+    }, '合成测试数据（数值检索）');
+
+    ok(!!doc.getElementById('paneValue'), '左栏存在数值检索面板');
+    ok(!!doc.getElementById('valueTag'), '数值检索有 tag 名称输入框');
+    window.__tagsearch.setMode('value');
+    ok(doc.getElementById('paneValue').style.display !== 'none', '切到数值模式 → 显示数值面板');
+    ok(doc.getElementById('paneBonus').style.display === 'none', '切到数值模式 → 加成面板隐藏');
+    ok(doc.getElementById('btnView').style.display === 'none', '数值模式隐藏「简/详」按钮');
+    ok(!!doc.getElementById('btnRunV') && doc.getElementById('btnRunV').textContent.trim() === '确认检索',
+      '数值面板有「确认检索」按钮');
+
+    ok(window.__tagsearch.setValueTag('伤害') === true, 'setValueTag(伤害) 成功');
+    const vHit = +doc.getElementById('nHit').textContent;
+    ok(vHit === 1, '按 tag「伤害」命中 1 个技能', vHit);
+    doc.getElementById('btnRunV').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === vHit, '点击「确认检索」重新执行数值搜索，结果一致');
+    let vBox = doc.getElementById('tblbox').textContent;
+    ok(/最高伤害: 120\/200\/280\/360/.test(vBox), '结果含「中文名: 数值」');
+    ok(!/（伤害）/.test(vBox), '不再重复展示检索的 tag 名称');
+    ok(!!doc.querySelector('#tblbox .skillgrid'), '数值检索改用等宽卡片网格展示');
+    ok(doc.querySelectorAll('#tblbox .skillcard').length === 1, '数值检索使用等宽技能卡片展示');
+    ok(doc.querySelectorAll('#tblbox .skillcard .scpic.ph').length === 1, '数值卡片预留图片占位位置');
+    ok(!doc.querySelectorAll('#tblbox thead th').length, '数值检索不再使用表头');
+
+    ok(window.__tagsearch.setValueTag('生命恢复增强') === true, 'setValueTag(生命恢复增强) 成功');
+    vBox = doc.getElementById('tblbox').textContent;
+    ok(/-20%/.test(vBox), '常规值含前后缀 -20%');
+    ok(/手填/.test(vBox) && /每秒恢复最大生命值/.test(vBox), '手填值标注且原样显示（泉水回春）');
+
+    window.__tagsearch.setValueTag('不存在的TagXYZ');
+    ok(+doc.getElementById('nHit').textContent === 0, '未识别 tag → 0 命中');
+    ok(/未识别/.test(doc.getElementById('valueTagList').textContent), '提示未识别的 tag 名称');
+
+    doc.getElementById('btnClearV').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(doc.getElementById('valueTag').value === '', '清空数值条件 → 输入框清空');
+    ok(+doc.getElementById('nHit').textContent === 0, '清空数值条件 → 0 命中');
+
+    // 候选：输入名称后列出同名 tag 的 id，人工选中后写入纯数字 id（精确匹配）
+    const vInput = doc.getElementById('valueTag');
+    const cands = doc.getElementById('valueCands');
+    vInput.value = '物品威力';
+    vInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+    ok(!cands.hidden, '输入 tag 名称 → 显示候选框');
+    const candEls = Array.prototype.slice.call(cands.querySelectorAll('.vc'));
+    ok(candEls.length === 2, '同名「物品威力」列出 2 个候选', candEls.length);
+    ok(candEls.some((el) => /1326/.test(el.textContent) && /包含效果/.test(el.textContent)) &&
+       candEls.some((el) => /1334/.test(el.textContent) && /加成属性/.test(el.textContent)),
+      '候选同时给出 tag id 与类别，供人工匹配');
+    const pick1326 = candEls.filter((el) => el.textContent.trim().indexOf('1326') === 0)[0];
+    ok(!!pick1326, '存在 1326（包含效果）候选');
+    pick1326.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    ok(vInput.value === '1326', '点击候选 → 写入纯数字 tag id', vInput.value);
+    vInput.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    ok(+doc.getElementById('nHit').textContent === 1, '按候选 id 精确命中 1 条（背刺）',
+      doc.getElementById('nHit').textContent);
+    ok(/额外物品威力/.test(doc.getElementById('tblbox').textContent), '结果展示填写的自定义中文名');
+
+    // 图片位置接口：注入 resolver 后占位块换成 img，清空后恢复占位
+    window.__tagsearch.setCardImageResolver(function (h) { return h.id === 1000 ? '/pic/1000.png' : ''; });
+    ok(doc.querySelectorAll('#tblbox img.scpic').length === 1, '注入图片接口 → 渲染 img 占位位');
+    ok(doc.querySelector('#tblbox img.scpic').getAttribute('src') === '/pic/1000.png', '图片接口返回 URL 生效');
+    window.__tagsearch.setCardImageResolver(null);
+    ok(doc.querySelectorAll('#tblbox .scpic.ph').length === 1, '清空图片接口 → 恢复占位块');
+
+    // ---- 图标归属：物品技能与英雄技能同 id 不互相覆盖；天赋技能用对应天赋的升级图标 ----
+    window.__tagsearch.applyDb({
+      fetchedAt: '2026-11-27T00:00:00.000Z',
+      tags: [{ id: 619, name: '隐藏状态', c1: '机制', c2: '状态效果' }],
+      notePool: [],
+      heroes: [{ i: 1, zh: '狼人', en: 'lycan', a: '力量' }],
+      imgMap: {
+        // 英雄技能 333 饿狼撕咬
+        333: {
+          s: 'icons/spellicons/lycan_wolf_bite_png.png',
+          u: 'icons/heroes/icons/npc_dota_hero_lycan_png.png'
+        },
+        // 物品技能 333 天界光耀：同 id 不同技能，键带 item: 前缀
+        'item:333': { s: 'icons/items/starforge_png.png', u: '' },
+        // 天赋技能：图片＝对应天赋的升级图标（6423 在 KV 是 Ability12 → 15 级右 → icons/1051.png）
+        6423: { s: 'icons/1051.png', u: 'icons/heroes/icons/npc_dota_hero_tusk_png.png' }
+      },
+      abilities: [
+        { i: 333, n: '饿狼撕咬', en: 'lycan_wolf_bite', h: [1], d: [], g: [], m: [],
+          e: [{ n: '效果1', t: [619] }] },
+        { i: 333, n: '天界光耀', en: 'Celestial Flare', src: 'item', in: '星铸之刃', d: [], g: [], m: [],
+          e: [{ n: '效果1', t: [619] }] },
+        { i: 6423, n: '+{s:value} 生命', en: 'special_bonus_hp_325', h: [1], d: [753], g: [], m: [],
+          e: [{ n: '生命值加成', t: [619] }] }
+      ]
+    }, '合成测试数据（图标归属）');
+    window.__tagsearch.setMode('tag');
     doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+    const icoIn = doc.querySelector('.grp[data-k="and"] .rows input');
+    icoIn.value = '隐藏状态';
+    icoIn.dispatchEvent(new window.Event('input', { bubbles: true }));
+    doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(doc.querySelectorAll('#tblbox .skillcard').length === 3, '三张卡片（英雄 / 物品 / 天赋）',
+      doc.querySelectorAll('#tblbox .skillcard').length);
+    ok(doc.querySelectorAll('#tblbox img.scpic[src="icons/spellicons/lycan_wolf_bite_png.png"]').length === 1,
+      '英雄技能 333（饿狼撕咬）取自己的技能图标');
+    ok(doc.querySelectorAll('#tblbox img.scpic[src="icons/items/starforge_png.png"]').length === 1,
+      '物品技能 333（天界光耀）不被英雄技能覆盖，仍取物品图标');
+    ok(doc.querySelectorAll('#tblbox img.scpic[src="icons/1051.png"]').length === 1,
+      '天赋技能图片＝对应天赋的升级图标（Ability12 → 15 级右 → icons/1051.png）');
+    ok(doc.querySelectorAll('#tblbox img.schico[src="icons/heroes/icons/npc_dota_hero_lycan_png.png"]').length === 1,
+      '英雄技能显示英雄头像');
+    ok(doc.querySelectorAll('#tblbox img.schico[src="icons/heroes/icons/npc_dota_hero_tusk_png.png"]').length === 1,
+      '天赋技能也显示归属英雄头像');
+    ok(doc.querySelectorAll('#tblbox .schd .schico').length === 2, '物品技能不显示单位小图标',
+      doc.querySelectorAll('#tblbox .schd .schico').length);
+    {
+      const itemCard = Array.from(doc.querySelectorAll('#tblbox .skillcard'))
+        .find(function (c) { return /天界光耀/.test(c.textContent); });
+      ok(!!itemCard && /星铸之刃/.test(itemCard.textContent),
+        '物品技能卡片第二行显示物品名（a.in）');
+      ok(!!itemCard && !/现版本物品技能/.test(itemCard.textContent),
+        '物品技能卡片不再显示「现版本物品技能」来源标签');
+    }
+
+    // ---- 非英雄单位技能：卡片第二行显示「原主」，不再显示「现版本非英雄单位技能」 ----
+    window.__tagsearch.applyDb({
+      fetchedAt: '2026-11-27T00:00:00.000Z',
+      tags: [{ id: 620, name: '缠绕', c1: '机制', c2: '状态效果' }],
+      notePool: [],
+      heroes: [],
+      imgMap: {},
+      abilities: [
+        { i: 5001, n: '弱化光环', en: 'ancient_rock_golem_weakening_aura', src: 'creep', o: '远古岩石傀儡',
+          d: [], g: [], m: [], e: [{ n: '效果1', t: [620] }] },
+        { i: 5002, n: '停滞', en: 'spawnlord_master_freeze', src: 'creep',
+          d: [], g: [], m: [], e: [{ n: '效果1', t: [620] }] }
+      ]
+    }, '合成测试数据（原主）');
+    window.__tagsearch.setMode('tag');
+    doc.getElementById('btnClear').dispatchEvent(new window.Event('click', { bubbles: true }));
+    const ownIn = doc.querySelector('.grp[data-k="and"] .rows input');
+    ownIn.value = '缠绕';
+    ownIn.dispatchEvent(new window.Event('input', { bubbles: true }));
+    doc.getElementById('btnRun').dispatchEvent(new window.Event('click', { bubbles: true }));
+    const ownCards = Array.prototype.slice.call(doc.querySelectorAll('#tblbox .skillcard'));
+    ok(ownCards.length === 2, '两张非英雄单位技能卡片', ownCards.length);
+    const ownerCard = ownCards.filter((c) => /弱化光环/.test(c.textContent))[0];
+    ok(!!ownerCard && ownerCard.querySelector('.hr') &&
+       ownerCard.querySelector('.hr').textContent.trim() === '远古岩石傀儡',
+      '卡片第二行只显示原主中文名（无「原主：」前缀）',
+      ownerCard && ownerCard.querySelector('.hr') && ownerCard.querySelector('.hr').textContent.trim());
+    ok(!/现版本非英雄单位技能/.test(doc.getElementById('tblbox').textContent),
+      '卡片不再显示「现版本非英雄单位技能」来源标签');
+    const noOwnerCard = ownCards.filter((c) => /停滞/.test(c.textContent))[0];
+    ok(!!noOwnerCard && !noOwnerCard.querySelector('.hr'), '原主未登记时该行留空（不渲染 .hr）');
+    noOwnerCard.querySelector('[data-detail]').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok(/原主/.test(doc.getElementById('mBody').textContent) &&
+       /未登记/.test(doc.getElementById('mBody').textContent),
+      '详情弹窗给「原主」段并注明未登记');
 
     console.log(fails ? `\n${fails} 项失败` : '\n全部通过');
     process.exit(fails ? 1 : 0);

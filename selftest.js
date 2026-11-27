@@ -227,6 +227,13 @@ if (idx.sourceCount.creep) {
   var nonItem = DB.abilities.filter(function (a) { return a.src !== 'item'; });
   ok2(idx.sourceCount.hero + idx.sourceCount.orphan + idx.sourceCount.creep === nonItem.length,
     'hero + orphan + creep = 技能总表非物品条目全量（' + nonItem.length + '）');
+  // 原主（2026-11-27）：creep 条目带 o = 《编写规范/非英雄单位技能.md》原主列的中文单位名
+  var creepOwned = creepSkills.filter(function (a) { return !!a.o; });
+  ok2(creepOwned.length > 0, '部分 creep 条目带原主（o）', creepOwned.length);
+  ok2(creepOwned.every(function (a) { return !/^npc_dota_/.test(a.o); }),
+    '原主已转成中文单位名（不是 npc_dota_ 代码名）');
+  ok2(creepSkills.filter(function (a) { return a.o === ''; }).length === 0,
+    '没有原主的 creep 条目干脆不写 o（界面留空）');
 } else {
   console.log('  ⚠ 当前 data.js 无 creep 条目（_raw.json 缺 creepRefs 或本地表为空）');
 }
@@ -427,3 +434,102 @@ ok2(core.search(idx, { and: ['光环（施法类型）'] }).stats.ambig.length =
 // 档位原则不变：写基础类别 = 命中任一档（含神杖/魔晶/天赋/命石变体）
 var upIds = idx.name2groups.get('光环').filter(function (g) { return g.cat === '施法类型'; })[0].variants.map(function (v) { return v.v; });
 ok2(upIds.length === 6 && upIds.indexOf('神杖') >= 0 && upIds.indexOf('命石') >= 0, '变体覆盖神杖/魔晶/天赋/命石/多样施法/其他来源', upIds.join(','));
+
+// ================= 加成检索（2026-11-23：按数据项名称里的替换符） =================
+console.log('\n[加成检索：数据项替换符]');
+var bt = core.bonusTags(idx);
+var ALLSRC = ['hero', 'item', 'creep', 'orphan', 'itemOld'];
+ok2(bt.length === 7, '加成属性 tag 共 7 个', bt.length);
+ok2(bt.every(function (t) { var x = idx.id2tag.get(t.id); return x && x.c1 === '图标' && x.c2 === '加成属性'; }),
+  '7 个 tag 全部来自「图标 / 加成属性」');
+ok2(bt.every(function (t, i) { return i === 0 || bt[i - 1].id < t.id; }), '加成 tag 按 id 升序');
+
+var b1160 = core.searchBonus(idx, { tag: 1160, sources: ALLSRC });
+ok2(b1160.stats.tag.name === '受作用范围加成影响', 'stats.tag 带 tag 名称', b1160.stats.tag.name);
+var pulse = b1160.hits.filter(function (h) { return h.id === 7710; })[0];
+ok2(!!pulse, '共鸣脉冲（7710）被「受作用范围加成影响」命中');
+ok2(pulse && pulse.items.some(function (it) { return it.name === '脉冲作用范围{%1160%}'; }),
+  '命中项名称 = 脉冲作用范围{%1160%}', pulse ? JSON.stringify(pulse.items) : '无');
+// 加成检索显示数值：按名称与 vx 一一对应，口径与数值检索完全一致
+function vxValueOf(skillId, name) {
+  var a = idx.abilities.filter(function (x) { return x.i === skillId; })[0];
+  var v = ((a && a.vx) || []).filter(function (x) { return x[0] === name; })[0];
+  return v ? String(v[1]) : '';
+}
+ok2(pulse && pulse.items.some(function (it) {
+  return it.name === '脉冲作用范围{%1160%}' && it.value === vxValueOf(7710, it.name) && it.value !== '';
+}), '加成项带数值（与 vx 同口径）', pulse ? JSON.stringify(pulse.items) : '无');
+ok2(b1160.hits.every(function (h) {
+  return h.items.every(function (it) { return it.tags.indexOf(1160) >= 0 && it.name.indexOf('{%1160%}') >= 0; });
+}), '不变量：每条命中的数据项名称都含 {%1160%}');
+ok2(b1160.hits.length > 0 && b1160.hits.every(function (h) { return h.count === h.items.length; }),
+  'count 与命中数据项数一致');
+Object.keys(b1160.counts).forEach(function (id) {
+  var c = b1160.counts[id];
+  ok2(c.skills <= c.items, 'counts：技能数 ≤ 数据项数（tag ' + id + '）', c.skills + '/' + c.items);
+});
+var bNone = core.searchBonus(idx, { sources: ALLSRC });
+ok2(bNone.hits.length === 0, '未选 tag 时 0 命中');
+var b1334 = core.searchBonus(idx, { tag: 1334, sources: ALLSRC });
+ok2(b1334.hits.length > 0 && b1334.counts[1334] !== undefined,
+  '物品威力（1334）有命中（物品技能无 is_show 字段视为开启）', b1334.hits.length + '/' + (b1334.counts[1334] || {}).items);
+var manaBreak = b1334.hits.filter(function (h) { return h.id === 302; })[0];
+ok2(!!manaBreak, '破法（净魂之刃，302）被「物品威力」命中');
+ok2(manaBreak && manaBreak.items.some(function (it) { return it.name === '每次燃烧魔法{%1334%}'; }),
+  '破法命中项名称 = 每次燃烧魔法{%1334%}', manaBreak ? JSON.stringify(manaBreak.items) : '无');
+ok2(manaBreak && manaBreak.items.every(function (it) {
+  return it.value === vxValueOf(302, it.name) && it.value !== '';
+}), '物品技能加成项也带数值');
+ok2(b1334.hits.every(function (h) { return h.items.every(function (it) { return it.tags.indexOf(1334) >= 0; }); }),
+  '不变量：物品威力命中的数据项都含 1334 替换符');
+var b1334hero = core.searchBonus(idx, { tag: 1334, sources: ['hero'] });
+ok2(b1334hero.hits.length === 0, '物品威力在「仅英雄技能」来源下 0 命中（该项属物品技能）', b1334hero.hits.length);
+var bHeroOnly = core.searchBonus(idx, { tag: 1160, sources: ['hero'] });
+ok2(bHeroOnly.stats.src.out > 0 && bHeroOnly.hits.length <= b1160.hits.length,
+  '来源筛选生效：仅现版本英雄技能时命中数不增', bHeroOnly.hits.length + '/' + b1160.hits.length);
+var vs = idx.heroes.filter(function (h) { return h.en === 'void_spirit'; })[0];
+if (vs) {
+  var bVs = core.searchBonus(idx, { tag: 1160, sources: ALLSRC, heroes: [vs.i] });
+  ok2(bVs.hits.some(function (h) { return h.id === 7710; }), '英雄筛选（虚空行者）后仍命中共鸣脉冲');
+  ok2(bVs.stats.hero.on && bVs.stats.hero.out > 0, '英雄筛选统计带出数', bVs.stats.hero.out);
+}
+
+// ================= 数值检索（2026-11-27） =================
+console.log('\n[数值检索：按 tag 名称检索数据项名称与数值]');
+var vHas = idx.abilities.filter(function (a) { return (a.vx || []).length; });
+ok2(vHas.length > 0, '至少有一个技能带 vx 数值数据项', vHas.length);
+var vRt = core.resolveTagIds(idx, ['伤害', '不存在的Tag名XYZ']);
+ok2(vRt.ids.indexOf(385) >= 0 && vRt.names.indexOf('伤害') >= 0, '解析 tag 名称「伤害」→ id 385');
+ok2(vRt.miss.indexOf('不存在的Tag名XYZ') >= 0, '未识别 tag 名称进 miss');
+ok2(core.resolveTagIds(idx, ['999999']).ids.indexOf(999999) >= 0, '纯数字输入按 id 直接解析');
+var vAll = core.searchValue(idx, { tags: ['伤害'], sources: ALLSRC });
+ok2(vAll.hits.length > 0, '按 tag「伤害」检索有命中', vAll.hits.length);
+ok2(vAll.hits.every(function (h) { return h.items.every(function (it) {
+  return it.matched.some(function (id) { return it.related.indexOf(id) >= 0 || it.placeholders.indexOf(id) >= 0; });
+}); }), '不变量：每条命中数据项的 matched tag 都在关联或替换符里');
+// 样本：黑暗之心「白天生命回复」= -20%（前缀 - + 20 + 后缀 %）
+var vDh = vAll.hits.filter(function (h) { return h.name === '黑暗之心'; })[0];
+if (!vDh) { vDh = core.searchValue(idx, { tags: ['生命恢复增强'], sources: ALLSRC })
+  .hits.filter(function (h) { return h.name === '黑暗之心'; })[0]; }
+var vDay = vDh && vDh.items.filter(function (it) { return it.name === '白天生命回复'; })[0];
+ok2(!!vDay, '黑暗之心「白天生命回复」被「生命恢复增强」检索到');
+ok2(vDay && vDay.value === '-20%' && vDay.prefix === '-' && vDay.suffix === '%' && !vDay.hand,
+  '常规值含前后缀：-20%（- + 20 + %）', vDay ? vDay.value : '无');
+// 样本：手填值不加前后缀（泉水回春 / 破法）
+var vHand = core.searchValue(idx, { tags: ['百分比最大生命恢复'], sources: ALLSRC });
+var vFountain = vHand.hits.filter(function (h) { return h.name === '泉水回春'; })[0];
+var vH5 = vFountain && vFountain.items.filter(function (it) { return it.name === '每秒恢复最大生命值'; })[0];
+ok2(vH5 && vH5.hand && vH5.value === '5' && !vH5.suffix,
+  '手填值原样：5（不加后缀 %）', vH5 ? JSON.stringify({ v: vH5.value, s: vH5.suffix }) : '无');
+// 数值展示不重复加后缀：墨涌「伤害增加{%1047%}」= 40%（手填值自带 %）
+var vInk = core.searchValue(idx, { tags: ['伤害'], sources: ALLSRC })
+  .hits.filter(function (h) { return h.name === '墨涌'; })[0];
+var vInkIt = vInk && vInk.items.filter(function (it) { return it.name === '伤害增加{%1047%}'; })[0];
+ok2(vInkIt && vInkIt.value === '40%', '手填值自带 % 时不重复拼接：40%', vInkIt ? vInkIt.value : '无');
+// 未选 tag → 0 命中；来源 / 英雄筛选
+ok2(core.searchValue(idx, { tags: [], sources: ALLSRC }).hits.length === 0, '未选 tag 时 0 命中');
+var vHero = core.searchValue(idx, { tags: ['伤害'], sources: ['hero'] });
+ok2(vHero.hits.length <= vAll.hits.length && vHero.stats.src.out > 0, '数值检索：来源筛选生效',
+  vHero.hits.length + '/' + vAll.hits.length);
+var vMiss = core.searchValue(idx, { tags: ['不存在的Tag名XYZ'], sources: ALLSRC });
+ok2(vMiss.hits.length === 0 && vMiss.tagMiss.length === 1, '全部 tag 未识别时 0 命中', vMiss.hits.length);

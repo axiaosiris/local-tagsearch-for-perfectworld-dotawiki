@@ -1,20 +1,38 @@
 @echo off
-chcp 65001 >nul
 cd /d "%~dp0"
-title tagsearch æœ¬åœ°æœåŠ¡
-
-set "PY=%PYTHON%"
-if "%PY%"=="" set "PY=python"
+title tagsearch ±¾µØ·þÎñ
+setlocal EnableExtensions
 
 echo ============================================================
-echo  tagsearch æœ¬åœ°æœåŠ¡ â€”â€” é™æ€æ‰˜ç®¡ + ä¸€é”®æ›´æ–°æ•°æ®
-echo  æ‰“å¼€åŽç‚¹å³ä¸Šè§’ã€Œæ›´æ–°æœ¬åœ°æ•°æ®ã€å³å¯æŠ“å– partner æœ€æ–°æ•°æ®
-echo  æŠ“å–éœ€ï¼šbsk daemon è¿è¡Œä¸­ + æµè§ˆå™¨å·²è¿ž browser-skill æ‰©å±•
-echo  åœæ­¢æœåŠ¡ï¼šåœ¨æœ¬çª—å£æŒ‰ Ctrl+C
+echo  tagsearch ±¾µØ·þÎñ - ¾²Ì¬ÍÐ¹Ü + Ò»¼ü¸üÐÂÊý¾Ý
+echo  Ò³Ãæµ¯³öÀ´ºó£¬µãÓÒÉÏ½Ç¡¸¸üÐÂ±¾µØÊý¾Ý¡¹×¥ partner ×îÐÂÊý¾Ý
+echo  ×¥È¡Ðè£ºbsk daemon ÔËÐÐÖÐ + ä¯ÀÀÆ÷ÒÑÁ¬ browser-skill À©Õ¹
+echo  Í£Ö¹·þÎñ£ºÔÚ±¾´°¿Ú°´ Ctrl+C
 echo ============================================================
 echo.
 
-"%PY%" serve.py --open
+call pypick.bat
+if not defined PY goto nopy
+
+echo Ê¹ÓÃ Python£º%PY%
 echo.
-echo æœåŠ¡å·²é€€å‡ºã€‚
+
+%PY% serve.py --open
+echo.
+echo ·þÎñÒÑÍË³ö¡£
 pause
+exit /b 0
+
+:nopy
+echo [´íÎó] Ã»ÕÒµ½¿ÉÓÃµÄ Python 3.7 ÒÔÉÏ°æ±¾¡£
+echo.
+echo   ´°¿ÚÀïµÄ python ¶à°ëÊÇ Windows ÉÌµêµÄ¼Ù python£¨µã¿ªÖ±½ÓÌøÉÌµê£©£¬
+echo   »ò Cygwin ×Ô´øµÄ 3.6£¨°æ±¾Ì«¾É¡¢Ò²Ã»ÓÐ Pillow£©¡£
+echo.
+echo   ÈÎÑ¡Ò»ÖÖ½â¾ö£º
+echo     1) ×° Python 3.11+£ºhttps://www.python.org/downloads/
+echo     2) ÒÑ¾­ÓÐ python.exe µÄ£¬°ÑËüÉè³É»·¾³±äÁ¿ PYTHON£¬ÔÙË«»÷±¾ÎÄ¼þ
+echo     3) »òÕßÔÚ±¾´°¿ÚÀïÊÖÇÃ£º  "ÍêÕûÂ·¾¶\python.exe" serve.py --open
+echo.
+pause
+exit /b 1

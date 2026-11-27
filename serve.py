@@ -22,17 +22,21 @@ import argparse
 import json
 import os
 import shutil
+import re
 import subprocess
 import sys
 import threading
 import time
 import webbrowser
+import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(ROOT, '_raw.json')
 DATA_JS = os.path.join(ROOT, 'data.js')
 REFRESH_SH = os.path.join(ROOT, 'refresh.sh')
+SHOT_DIR = os.path.join(ROOT, 'screenshots')
+SHOT_MAX = 300 * 1024 * 1024        # 单张截图上限 300MB（正常 5~20MB）
 APP = 'tagsearch'
 
 _LOCK = threading.Lock()
@@ -240,16 +244,67 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self) -> None:                               # noqa: N802
-        if self._path() == '/api/refresh':
+        p = self._path()
+        if p == '/api/refresh':
             n = int(self.headers.get('Content-Length') or 0)
             if n:
                 self.rfile.read(n)
             return self._json(refresh())
+        if p == '/api/save-shot':
+            return self._save_shot()
         self._json({'ok': False, 'error': 'unknown endpoint'}, 404)
+
+    def _save_shot(self) -> None:
+        """页面截图落盘：POST /api/save-shot?name=xxx.png，body = PNG 二进制。
+        前端优先走这里（保存到 tagsearch/screenshots，路径固定、无下载弹窗），
+        该接口不存在时（如用别的静态服务打开）自动退回浏览器下载。"""
+        qs = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        name = (qs.get('name') or [''])[0]
+        name = os.path.basename(name).strip() or 'shot.png'
+        name = re.sub(r'[\\/:*?"<>|\r\n\t]', '_', name)      # Windows 文件名非法字符
+        if not name.lower().endswith('.png'):
+            name += '.png'
+        name = name[:120]
+        try:
+            n = int(self.headers.get('Content-Length') or 0)
+        except ValueError:
+            n = 0
+        if n <= 0 or n > SHOT_MAX:
+            return self._json({'ok': False, 'error': '截图大小异常：%d' % n}, 400)
+        data = self.rfile.read(n)
+        if data[:8] != b'\x89PNG\r\n\x1a\n':
+            return self._json({'ok': False, 'error': '不是 PNG 数据'}, 400)
+        os.makedirs(SHOT_DIR, exist_ok=True)
+        path = os.path.join(SHOT_DIR, name)
+        stem, ext = os.path.splitext(path)
+        i = 2
+        while os.path.exists(path):                         # 同一分钟重复截图不覆盖
+            path = '%s_%d%s' % (stem, i, ext)
+            i += 1
+        with open(path, 'wb') as f:
+            f.write(data)
+        rel = os.path.relpath(path, ROOT).replace('\\', '/')
+        return self._json({'ok': True, 'path': rel, 'bytes': len(data)})
 
     def log_message(self, fmt, *args):                       # 安静一点，只留错误
         if str(args[1] if len(args) > 1 else '').startswith(('4', '5')):
             sys.stderr.write('[tagsearch] %s\n' % (fmt % args))
+
+
+def open_page(url: str) -> None:
+    """用系统默认浏览器打开页面：Windows 上 os.startfile 比 webbrowser 稳
+    （webbrowser 依赖 BROWSER/cygstart 等外部条件，双击启动时经常什么都不发生）。
+    失败也不抛，反正终端里已经印了地址。"""
+    try:
+        if os.name == 'nt':
+            os.startfile(url)                       # type: ignore[attr-defined]
+            return
+    except Exception:
+        pass
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
 
 
 def main() -> None:
@@ -262,13 +317,17 @@ def main() -> None:
     try:
         srv = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
     except OSError as e:
-        print('端口 %d 无法绑定：%s' % (args.port, e))
-        print('换个端口：python serve.py --port 8900')
+        # 端口被占八成是上一次的服务还开着 —— 直接把页面打开，不报错退出
+        print('端口 %d 已被占用（%s）' % (args.port, e))
+        print('如果服务已在运行，直接打开：%s' % url)
+        print('想换端口：set TAGSEARCH_PORT=8900 后再启动')
+        if args.open:
+            open_page(url)
         return
     print('tagsearch 本地服务已启动：%s' % url)
-    print('数据更新接口：POST /api/refresh   （Ctrl+C 停止）')
+    print('数据更新接口：POST /api/refresh   截图落盘：POST /api/save-shot   （Ctrl+C 停止）')
     if args.open:
-        threading.Timer(0.6, lambda: webbrowser.open(url)).start()
+        threading.Timer(0.6, lambda: open_page(url)).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

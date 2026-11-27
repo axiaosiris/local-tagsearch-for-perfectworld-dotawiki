@@ -230,6 +230,24 @@ for h in heroes_raw:
 # 该表由人工逐条维护：中文名 / 代码名 /（可选）后台 id / 分类 / 使用单位，
 # 2026-11-09 起为五列（新增后台 id），故按「拆列后取首列+代码列+倒数第二列为分类」解析，四列版同样兼容。
 CREEP_MD = os.environ.get('CREEP_MD') or os.path.join(BASE, '..', '编写规范', '非英雄单位技能.md')
+# 单位代码名 → 简体中文名（「原主」列写的是 npc_dota_xxx，界面要显示中文）
+CREEP_LOC = os.environ.get('CREEP_LOC') or os.path.join(
+    BASE, '..', 'npc', 'resource', 'localization', 'abilities_schinese.txt')
+
+
+def load_loc_names(path):
+    m = {}
+    if not os.path.isfile(path):
+        return m
+    with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            mm = re.match(r'\s*"([^"]+)"\s+"([^"]*)"', line)
+            if mm:
+                m[mm.group(1)] = mm.group(2)
+    return m
+
+
+loc_names = load_loc_names(CREEP_LOC)
 creep_by_en = {}
 if os.path.isfile(CREEP_MD):
     with open(CREEP_MD, 'r', encoding='utf-8') as f:
@@ -243,10 +261,77 @@ if os.path.isfile(CREEP_MD):
             m = re.match(r'^`([^`]+)`$', cells[1])
             if not m:
                 continue
-            creep_by_en[m.group(1)] = {'zh': cells[0], 'cat': cells[-2]}
-    print('非英雄单位技能表：%s（%d 条）' % (os.path.normpath(CREEP_MD), len(creep_by_en)))
+            # 列：中文名 / 代码名 / 后台 id / 分类 / 原主 / 使用单位。
+            # 「原主」列 2026-11-27 才加，旧版五列没有 → 按列数判定，仍兼容旧表。
+            if len(cells) >= 6:
+                cat, owner_cell = cells[-3], cells[-2]
+            else:
+                cat, owner_cell = cells[-2], ''
+            om = re.match(r'^`([^`]+)`$', owner_cell) if owner_cell else None
+            owner_code = om.group(1) if om else ''
+            creep_by_en[m.group(1)] = {
+                'zh': cells[0], 'cat': cat,
+                'ownerCode': owner_code,
+                'owner': loc_names.get(owner_code, '') if owner_code else '',
+            }
+    with_owner = sum(1 for v in creep_by_en.values() if v['owner'])
+    print('非英雄单位技能表：%s（%d 条，有原主 %d 条）'
+          % (os.path.normpath(CREEP_MD), len(creep_by_en), with_owner))
 else:
     print('⚠️ 未找到非英雄单位技能表（%s）→ 本次不写 creep 来源' % os.path.normpath(CREEP_MD))
+
+# ---------------------------------------------------------------- 物品名（卡片第二行）
+# 2026-11-27 用户定：物品技能卡片第二行显示**物品名**，不再显示「现版本物品技能」来源标签。
+# 解析：本地化物品名 DOTA_Tooltip_Ability_item_<code>（权威，如 crellas_crozier→克莱拉牧杖）
+#   →《物品技能.md》段落标题 → 技能名文本规则（阿哈利姆系列、神符这类表里没登记的）。
+ITEM_MD = os.environ.get('ITEM_MD') or os.path.join(BASE, '..', '编写规范', '物品技能.md')
+
+
+def item_names():
+    code_of, title_of = {}, {}
+    if os.path.isfile(ITEM_MD):
+        with open(ITEM_MD, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.startswith('## '):
+                    continue
+                cm = re.search(r'`(item_[a-z0-9_]+)`', line)
+                im = re.search(r'后台\s*id\s*[=：:]\s*(\d+)', line)
+                if not (cm and im):
+                    continue
+                aid = im.group(1)
+                if aid in code_of:          # 同一 id 多段落时取首个
+                    continue
+                code_of[aid] = cm.group(1)
+                title_of[aid] = line[3:].split('—')[0].strip()
+    loc_lower = {}
+    for k, v in loc_names.items():
+        loc_lower.setdefault(k.lower(), v)
+    out = {}
+    for aid, code in code_of.items():
+        zh = loc_lower.get(('DOTA_Tooltip_Ability_item_' + code[len('item_'):]).lower(), '')
+        nm = zh or title_of.get(aid, '')
+        if nm:
+            out[aid] = nm
+    return out
+
+
+def item_name_fallback(skill_name):
+    """未在《物品技能.md》登记的物品技能 → 物品名。
+    「激活圣水神符」→「圣水神符」；「技能升级（阿哈利姆神杖）」→「阿哈利姆神杖」；其余还原名。"""
+    n = (skill_name or '').strip()
+    if not n:
+        return ''
+    if n.startswith('激活'):
+        return n[2:].strip()
+    parens = re.findall(r'（([^）]+)）', n)
+    if parens:
+        return parens[-1].strip()
+    return n
+
+
+item_name_by_id = item_names()
+if item_name_by_id:
+    print('物品名映射：%d 条（来源《物品技能.md》+ 本地化）' % len(item_name_by_id))
 
 # ---------------------------------------------------------------- 技能主表
 # 三类来源共用同一套池化逻辑：
@@ -259,6 +344,10 @@ feat_skills = 0
 note_skills = 0
 note_line_refs = 0
 cast_skills = 0
+bonus_skills = 0
+bonus_items = 0
+value_skills = 0
+value_items = 0
 map_by_field = 0
 map_none = 0
 
@@ -289,6 +378,36 @@ for a, src in rows_in:
 
     b = {k: a.get(k, []) for k in ('i', 'n', 'en', 'd', 'g', 'm', 'e')}
 
+    # 加成属性数据项（2026-11-23）：名称含 {%加成tag id%} 且 isShow=1 的自定义中文名。
+    # 格式 bx=[[中文名(含替换符), [tag id…]], …]；旧快照无 bx 时为空，检索器显示 0 命中。
+    bx = []
+    for x in (a.get('bx') or []):
+        if not isinstance(x, dict):
+            continue
+        nm = str(x.get('n') or '')
+        ids = []
+        for tid in (x.get('t') or []):
+            try:
+                ids.append(int(tid))
+            except (TypeError, ValueError):
+                pass
+        if nm and ids:
+            bx.append([nm, ids])
+    if bx:
+        b['bx'] = bx
+        bonus_skills += 1
+        bonus_items += len(bx)
+
+    # 数值数据项（2026-11-27）：所有「自定义中文名 + 数值」。抓取端已压成紧凑数组，直接透传。
+    vx = []
+    for x in (a.get('vx') or []):
+        if isinstance(x, list) and len(x) >= 2 and str(x[0] or '').strip():
+            vx.append(x)
+    if vx:
+        b['vx'] = vx
+        value_skills += 1
+        value_items += len(vx)
+
     # 本次抓取日更新过 → 标 nx=1：id ≥ 20000 也不按「自定义技能」排除（见文件头 is_fresh）
     if is_fresh(a.get('ut')):
         b['nx'] = 1
@@ -303,8 +422,23 @@ for a, src in rows_in:
 
     if src:
         b['src'] = src
-        if item_cur and a.get('i') in item_refs:
-            b['cur'] = 1
+
+    # 物品名（卡片第二行显示，2026-11-27 用户定）
+    if src == 'item':
+        nm_item = item_name_by_id.get(str(a.get('i'))) or item_name_fallback(a.get('n'))
+        if nm_item:
+            b['in'] = nm_item
+
+    # 现版本物品技能（道具数据里 cate1 非空且非已移除/未发布）→ cur=1
+    if item_cur and a.get('i') in item_refs:
+        b['cur'] = 1
+
+    # 非英雄单位技能的「原主」中文名：界面卡片用它替代「现版本非英雄单位技能」这种来源标签，
+    # 查不到原主（旧版已删单位 / 类级 / 机制技能）就不写，界面留空。
+    if src == 'creep':
+        owner = (creep_by_en.get(a.get('en')) or {}).get('owner')
+        if owner:
+            b['o'] = owner
 
     raw = a.get('f') or []
     fidx = []
@@ -355,13 +489,31 @@ out = {
 if item_cur:
     out['itemCur'] = True
 
+# 本地图标映射（scripts/download_icons.py 生成）：技能 id → {s:技能图标, u:单位图标}。
+# 文件不存在时不写 imgMap，界面自动回退占位块；不影响抓取/构建主流程。
+img_map_count = 0
+img_map_path = os.path.join(BASE, 'scripts', 'imgmap.json')
+if os.path.isfile(img_map_path):
+    with open(img_map_path, 'r', encoding='utf-8') as f:
+        out['imgMap'] = json.load(f)
+    img_map_count = len(out['imgMap'])
+
 # 把非英雄单位技能代码名回写进 _raw.json：页面内置的 buildDbFromRaw 读 creepRefs，
 # 这样别人拿这份 _raw.json 在浏览器里重建，也能得到同样的 creep 来源。
+# creepOwners 同步回写「代码名 → 原主中文名」，让内建构建也能显示原主（没有原主的条目不在其中）。
+creep_owners = {k: v['owner'] for k, v in creep_by_en.items() if v.get('owner')}
+need_raw = False
 if creep_by_en and list(d.get('creepRefs') or []) != sorted(creep_by_en):
     d['creepRefs'] = sorted(creep_by_en)
+    need_raw = True
+if creep_owners and d.get('creepOwners') != creep_owners:
+    d['creepOwners'] = creep_owners
+    need_raw = True
+if need_raw:
     with open(SRC, 'w', encoding='utf-8') as f:
         json.dump(d, f, ensure_ascii=False, separators=(',', ':'))
-    print('已把 creepRefs（%d 个代码名）回写 _raw.json' % len(d['creepRefs']))
+    print('已回写 _raw.json：creepRefs %d 个代码名 / creepOwners %d 条原主'
+          % (len(d.get('creepRefs') or []), len(d.get('creepOwners') or {})))
 
 with open(DST, 'w', encoding='utf-8') as f:
     f.write('window.TAGDB=')
@@ -373,10 +525,11 @@ item_n = sum(1 for b in abilities if b.get('src') == 'item')
 creep_n = sum(1 for b in abilities if b.get('src') == 'creep')
 creep_miss = sorted(set(creep_by_en) - set(b.get('en') for b in abilities if b.get('src') == 'creep'))
 print('data.js 已生成：tags=%d abilities=%d（英雄 %d / 物品 %d / 非英雄单位 %d）特性tag=%d 池槽=%d 引用=%d 带内容技能=%d '
-      '注释行池=%d 注释引用=%d 带注释技能=%d 带前摇技能=%d size=%.0f KB'
+      '注释行池=%d 注释引用=%d 带注释技能=%d 带前摇技能=%d 加成数据项=%d（技能 %d）数值数据项=%d（技能 %d）图标映射=%d size=%.0f KB'
       % (len(out['tags']), len(out['abilities']), len(out['abilities']) - item_n - creep_n, item_n, creep_n,
          len(feat_text), feat_items, refs[0], feat_skills,
-         len(note_pool), note_line_refs, note_skills, cast_skills, os.path.getsize(DST) / 1024.0))
+         len(note_pool), note_line_refs, note_skills, cast_skills, bonus_items, bonus_skills, value_items, value_skills,
+         img_map_count, os.path.getsize(DST) / 1024.0))
 print('现版本物品技能（有分类物品引用）：%d 个 id（itemCur=%s）' % (len(item_refs), item_cur))
 if creep_by_en:
     print('非英雄单位技能：命中 %d / 表内 %d%s'

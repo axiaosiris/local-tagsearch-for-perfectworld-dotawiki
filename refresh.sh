@@ -75,4 +75,7 @@ PYTHON="${PYTHON:-python}"
 #    否则用书签抓出来的 _raw.json 会把新增的非英雄单位技能误标成英雄技能。
 "$PYTHON" scripts/build_bookmarklet.py || exit 1
 
+echo "重建 file:// 截图用的图标内联包…"
+"$PYTHON" scripts/gen_icon_b64.py || true
+
 echo "完成 —— 刷新 index.html 即可看到最新数据。"

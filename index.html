@@ -93,11 +93,13 @@ header .meta b{color:#374151;font-weight:600}
   flex-wrap:wrap;font-size:13px}
 .sum b.n{color:var(--pri);font-size:16px}
 .sum .sp{flex:1}
+/* 检索条件重述（命中数下方一行） */
+.sum .qcond{flex-basis:100%;margin:2px 0 0;font-size:12.5px;line-height:1.75;color:var(--sub);
+  word-break:break-word}
+.sum .qcond b{color:#374151;font-weight:600}
+.sum .qcond .kw{color:#7b8794}
 .tblbox{max-height:calc(100vh - 190px);overflow:auto}
 table{border-collapse:collapse;width:100%;font-size:13px}
-/* Tag 结果表列较多（升级项/技能/ID/施法前摇/命中详情/tag 数/详情）：
-   窄窗口下保底宽度 + 容器横向滚动，避免末列「详情」被挤成竖排 */
-.tblbox table.tagTbl{min-width:900px}
 th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line2);vertical-align:top}
 thead th{position:sticky;top:0;background:#fbfcfe;z-index:2;font-weight:600;font-size:12.5px;color:#4a5568;
   border-bottom:1px solid var(--line)}
@@ -128,6 +130,11 @@ td.en{color:#9aa4b2;font-size:11.5px;word-break:break-all}
 .empty{padding:34px;text-align:center;color:var(--sub);font-size:13px}
 .mask{position:fixed;inset:0;background:rgba(20,24,32,.42);display:none;align-items:center;justify-content:center;z-index:50;padding:24px}
 .mask.on{display:flex}
+/* 轻提示（操作反馈，不打断流程） */
+.toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:#1f2733;color:#fff;
+  padding:8px 15px;border-radius:8px;font-size:12.5px;line-height:1.6;box-shadow:0 8px 22px rgba(16,24,40,.28);
+  opacity:0;transition:opacity .18s;pointer-events:none;z-index:90;max-width:70vw}
+.toast.on{opacity:.95}
 .modal{background:#fff;border-radius:12px;max-width:840px;width:100%;max-height:84vh;overflow:auto;
   box-shadow:0 18px 48px rgba(16,24,40,.22)}
 .modal .mhd{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);
@@ -141,7 +148,9 @@ td.en{color:#9aa4b2;font-size:11.5px;word-break:break-all}
 .infobox{margin:0 0 12px;padding:9px 12px;border-radius:8px;background:#f2f7fd;border:1px solid #d3e2f4;
   color:#33587f;font-size:12.5px}
 .infobox b{color:#1a4b7f}
-/* 元信息里的可点入口 + 同名一览弹窗 */
+/* 结果区的统计说明属于冗长注释，默认不显示；警示类(.warn)保留 */
+.infobox:not(.warn){display:none}
+/* 同名 tag 类别小标 / 表格（图标教程弹窗复用 .dupTbl） */
 .meta .lnk{cursor:pointer;color:#1a4b7f;text-decoration:underline dotted;text-underline-offset:2px}
 .meta .lnk:hover{color:#0d6efd}
 .dupTbl{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -223,7 +232,7 @@ td.upcell{white-space:normal;vertical-align:middle}
 .btn.on{background:#e8f0fb;border-color:#b9d2f0;color:#1a5fa8;font-weight:650}
 .tip{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.7}
 .kbd{background:#f2f4f8;border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px}
-.hdact{margin-left:auto}
+.hdact{margin-left:auto;display:flex;align-items:center;gap:8px}
 .uplog{background:#fbfcfe;border:1px solid var(--line);border-radius:8px;padding:9px 11px;
   font:12px/1.75 ui-monospace,Consolas,Menlo,monospace;max-height:240px;overflow:auto;
   white-space:pre-wrap;word-break:break-all;color:#3b4653;min-height:76px}
@@ -253,10 +262,35 @@ details.mk[open]>summary{margin-bottom:8px}
 .mbtn+.mbtn{border-left:1px solid var(--line)}
 .mbtn:hover{background:#eef2f8}
 .mbtn.on{background:#fff;color:var(--pri);font-weight:650;box-shadow:inset 0 -2px 0 var(--pri)}
+/* ---------- 加成检索 ---------- */
+.bonuslist{display:flex;flex-direction:column;gap:5px}
+.bonuslist label{display:flex;align-items:flex-start;gap:7px;padding:6px 8px;border:1px solid var(--line);
+  border-radius:7px;background:#fff;cursor:pointer;font-size:13px;line-height:1.45}
+.bonuslist label:hover{border-color:var(--pri);background:var(--pri-bg)}
+.bonuslist label.on{border-color:var(--pri);background:var(--pri-bg);box-shadow:inset 0 0 0 1px var(--pri)}
+.bonuslist input{margin-top:3px;flex:none}
+.bonuslist .bn{flex:1;min-width:0}
+.bonuslist .bc{color:var(--sub);font-size:11px;font-variant-numeric:tabular-nums}
+.bonuslist .bid{color:#a6b0bd;font-size:11px;font-variant-numeric:tabular-nums}
 /* ---------- 注释检索 ---------- */
 .noteq{width:100%;padding:8px 10px;font:13px/1.6 inherit;color:var(--text);border:1px solid var(--line);
   border-radius:8px;background:#fff;outline:none;resize:vertical;min-height:68px}
 .noteq:focus{border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-bg)}
+/* 数值检索：tag 候选（用户按 id 匹配，点击写入精确类别名） */
+.vinputwrap{position:relative}
+.valcands{position:absolute;left:0;right:0;top:100%;z-index:80;margin-top:4px;max-height:270px;
+  overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 10px 26px rgba(28,38,55,.16)}
+.valcands[hidden]{display:none}
+.valcands .vc{display:flex;align-items:baseline;gap:8px;padding:6px 10px;cursor:pointer;font-size:12.5px;
+  border-bottom:1px solid var(--line2);line-height:1.5}
+.valcands .vc:last-child{border-bottom:0}
+.valcands .vc:hover,.valcands .vc.on{background:var(--pri-bg)}
+.valcands .vc .vid{color:var(--pri);font-variant-numeric:tabular-nums;min-width:40px;text-align:right;flex:none}
+.valcands .vc .vn{color:var(--text);font-weight:600}
+.valcands .vc .vcat{color:var(--sub);font-size:11px;flex:1}
+.valcands .vc .vnitem{color:var(--sub);font-size:11px;font-variant-numeric:tabular-nums;flex:none}
+.valcands .vempty{padding:8px 10px;color:var(--sub);font-size:12px}
 .nline{line-height:1.62;margin-bottom:2px;white-space:normal}
 .nline .ln{display:inline-block;min-width:26px;color:#a6b0bd;font-size:11px;font-variant-numeric:tabular-nums}
 .nline.more{color:var(--sub);font-size:12px}
@@ -269,6 +303,48 @@ mark{background:#fff2ac;color:inherit;padding:0 1px;border-radius:2px}
 .tblbox table.noteTbl{min-width:700px;table-layout:fixed}
 .nline{word-break:break-word}
 .noteTbl td:last-child{white-space:nowrap;padding-left:4px;padding-right:6px}
+/* ---------- 加成 / 数值结果：等宽自适应技能卡片 ----------
+   --card-min 由本次结果的最长条目动态算出（条目越长 → 卡片越宽 → 每行越少）；
+   auto-fill 按容器实际宽度（= 显示器分辨率）决定每行个数；1fr 保证每个技能宽度完全一致。 */
+.skillgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--card-min,260px),1fr));
+  gap:10px;padding:12px 14px 16px;align-items:start}
+.skillcard{box-sizing:border-box;min-width:0;border:1px solid var(--line);border-radius:6px;
+  background:#f2f3f5;padding:10px 12px 12px}
+.skillcard.ex{opacity:.72}
+.skillcard .schd{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.skillcard .schico{width:19px;height:19px;flex:none;border-radius:3px;object-fit:contain}
+.skillcard .schico.phico{background:#c8cfd8;opacity:.65}
+.skillcard .scnm{font-weight:700;font-size:14px;color:#c62828;word-break:break-word;min-width:0;line-height:1.35}
+.skillcard .scid{color:#9aa4b2;font-size:11px;font-variant-numeric:tabular-nums;
+  white-space:nowrap;flex:none;margin-left:auto}
+/* 图片位置接口：无 URL 时渲染占位块；有 URL 时换成 <img class="scpic">。
+   URL 由 cardImageSrc(h) 解析（默认读 h.img / h.pic / h.ability.img），可扩展。 */
+.skillcard .scbody{display:flex;align-items:flex-start;gap:10px}
+.skillcard .scpic{flex:none;width:88px;height:88px;object-fit:cover;border-radius:2px;background:#dfe3e8}
+.skillcard .scpic.ph{display:flex;align-items:center;justify-content:center;color:#b0b8c2;
+  font-size:11px;border:1px dashed #c8cfd8;box-sizing:border-box}
+.skillcard .scinfo{flex:1;min-width:0}
+.skillcard .scen{color:#9aa4b2;font-size:11px;word-break:break-all;margin-top:2px}
+.skillcard .hr{color:#8a95a5;font-size:11.5px;margin-top:2px;font-weight:400}
+/* 升级项就地替换数据项中文名里的 {%id%}，不再单独堆在条目上方 */
+.skillcard .upinline{display:inline-flex;flex-direction:row;align-items:center;gap:2px;
+  vertical-align:middle;padding:0 3px;margin:0 1px;border-radius:4px;font-size:11px;line-height:1.4}
+.skillcard .upinline .ico{width:13px;height:13px}
+.skillcard .upinline .lb{font-size:10.5px}
+.skillcard .scitems{margin-top:2px}
+.skillcard .scit{line-height:1.62;font-size:12.5px;word-break:break-word;margin-bottom:2px;color:#333}
+.skillcard .scit .vv{color:#152b45;font-weight:650;margin-left:4px}
+.skillcard .scit .bc{color:var(--sub);font-size:11px;font-weight:400}
+/* Tag 检索详细卡片：沿数值卡片版式，但不带数值；特性描述随 chip 换行 */
+.skillcard .tagcast,.skillcard .tagup{margin-bottom:4px;font-size:11.5px;color:#6b7684}
+.skillcard .tagcast .cpcell{margin-left:4px}
+.skillcard .tagup .ups{display:inline-block;vertical-align:middle}
+.skillcard .tagitems .chip{max-width:100%;white-space:normal;word-break:break-word}
+/* 升级项 chip 与命中位置 chip 同行：行内 flex，垂直居中（2026-11-27 用户定） */
+.skillcard .tagitems .ups.inl{display:inline-flex;flex-wrap:wrap;gap:4px;vertical-align:middle;
+  margin:0 6px 5px 0}
+.skillcard .tagitems .ups.inl .up{vertical-align:middle}
+.skillcard .scdetail{margin-top:6px;font-size:12px;padding-left:0}
 /* 技能筛选（按数据来源；英雄 / 物品 / 目录外 / 非现版本物品 / 非英雄单位，登记表见 search-core.js 的 SOURCES） */
 .hdright{display:flex;align-items:center;gap:8px}
 .hdright .tip{margin:0}
@@ -293,9 +369,11 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   <div class="modes" id="modes">
     <button class="mbtn on" data-mode="tag" title="按 tag（标签）检索技能">Tag 检索</button>
     <button class="mbtn" data-mode="note" title="在技能注释里查找文字">注释检索</button>
+    <button class="mbtn" data-mode="bonus" title="检索数据项名称里的加成替换符">加成检索</button>
+    <button class="mbtn" data-mode="value" title="按 tag 名称检索数据项的自定义中文名与数值">数值检索</button>
   </div>
-  <div class="meta">数据快照 <b id="mTime">—</b> ｜ Tag <b id="mTags">—</b> 条 ｜ 技能 <b id="mAbs">—</b> 条 ｜ 英雄 <b id="mHero">—</b> 个 ｜ 注释 <b id="mNotes">—</b> 条 ｜ 同名 <b id="mDup" class="lnk" title="查看全部同名 tag（哪些只是多档位、哪些是不同含义）">—</b></div>
-  <div class="hdact"><button class="btn" id="btnUpdate" title="从 partner 后台抓取最新数据">⟳ 更新本地数据</button></div>
+  <div class="meta">数据快照 <b id="mTime">—</b></div>
+  <div class="hdact"><button class="btn" id="btnShot" title="把结果区（含检索条件）截成一张长图；双击打开(file://)时会自动加载本地图标包">截图</button><button class="btn" id="btnIcon" title="说明如何把图标文件复制进 icons 文件夹">更新本地图标</button><button class="btn" id="btnUpdate" title="从 partner 后台抓取最新数据">⟳ 更新本地数据</button></div>
 </header>
 
 <div class="wrap">
@@ -313,33 +391,31 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       <div class="hd"><h2>检索条件</h2><button class="btn link" id="btnClear">清空</button></div>
       <div class="bd">
         <div class="scope">
-          <div class="ttl">匹配范围（技能记录中的 tag 存放位置）</div>
           <label><input type="checkbox" id="scD" checked> 技能类型</label>
           <label><input type="checkbox" id="scE" checked> 技能效果</label>
           <label><input type="checkbox" id="scM" checked> 技能特性</label>
-          <label><input type="checkbox" id="scG" checked> tags 字段</label>
         </div>
 
         <div class="grp and" data-k="and">
-          <div class="grphd"><span class="t">必须包含（且）</span><span class="hint">须同时含全部</span>
+          <div class="grphd"><span class="t">必须包含（且）</span>
             <button class="btn" data-add="and">+ 添加</button></div>
           <div class="rows"></div>
         </div>
 
         <div class="grp or" data-k="or">
-          <div class="grphd"><span class="t">至少包含一项（或）</span><span class="hint">含任一即可</span>
+          <div class="grphd"><span class="t">至少包含一项（或）</span>
             <button class="btn" data-add="or">+ 添加</button></div>
           <div class="rows"></div>
         </div>
 
         <div class="grp not" data-k="not">
-          <div class="grphd"><span class="t">必须排除（反选）</span><span class="hint">含任一即剔除</span>
+          <div class="grphd"><span class="t">必须排除（反选）</span>
             <button class="btn" data-add="not">+ 添加</button></div>
           <div class="rows"></div>
         </div>
 
         <div class="cpbox">
-          <div class="ttl">施法前摇 <span class="hint">秒 · 闭区间，可与上方 tag 条件同时生效</span></div>
+          <div class="ttl">施法前摇</div>
           <div class="cprow">
             <input type="number" id="cpMin" min="0" step="0.01" placeholder="最小" title="区间下限（留空=不限）">
             <span class="sep">~</span>
@@ -352,22 +428,21 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         </div>
 
         <div class="unitbox">
-          <div class="ttl">匹配粒度 <span class="hint">多个 tag 在多大范围里同时成立</span></div>
+          <div class="ttl">匹配粒度</div>
           <label><input type="radio" name="unitMode" value="skill">
-            <span><b>整条技能合并</b> <span class="hint">— 不限位置，最宽松</span></span></label>
+            <span><b>整条技能合并</b></span></label>
           <label><input type="radio" name="unitMode" value="effect" checked>
-            <span><b>效果类 tag 需同一效果条目</b> <span class="hint">— 包含效果 / 状态效果 / 驱散情况 / 伤害类型… 须落在同一条效果里</span></span></label>
+            <span><b>效果类 tag 需同一效果条目</b></span></label>
           <label><input type="radio" name="unitMode" value="all">
-            <span><b>所有 tag 需同一效果条目</b> <span class="hint">— 除技能行为、施法类型、技能类别、冷却类型、魔法消耗、生命消耗、攻击命中判定等技能级类别外，其余 tag 都必须落在同一条效果里</span></span></label>
+            <span><b>所有 tag 需同一效果条目</b></span></label>
         </div>
-        <label class="fuzzy"><input type="checkbox" id="fuzzy"> 模糊匹配：输入子串匹配全部同名/含该词的 tag（如「防御塔」→ 友方/敌方防御塔）</label>
-        <label class="fuzzy"><input type="checkbox" id="showEx"> <span class="fz">包含被排除项：默认不检索 <b>废弃条目</b>（名含「废」）、<b>自定义技能</b>（id ≥ 20000，本次抓取日更新过的除外）、<b>公式残条</b>（名以「-{」开头）</span></label>
+        <label class="fuzzy"><input type="checkbox" id="fuzzy"> 模糊匹配</label>
+        <label class="fuzzy"><input type="checkbox" id="showEx"> <span class="fz">包含被排除项</span></label>
 
-        <div class="expr" id="expr"><span class="dim">当前条件：（未设置）</span></div>
+        <div class="expr" id="expr" style="display:none"></div>
 
         <div class="actions">
           <button class="btn pri" id="btnRun">检 索</button>
-          <span class="tip" style="margin:0">回车即可执行 · 每类最多 5 个</span>
         </div>
       </div>
     </div>
@@ -375,24 +450,41 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     <div class="card" id="paneNote" style="display:none">
       <div class="hd"><h2>注释检索</h2><button class="btn link" id="btnClearN">清空</button></div>
       <div class="bd">
-        <div class="ttl" style="width:100%;font-size:12px;color:var(--sub);margin-bottom:6px">
-          在「技能注释」（后台富文本）里查找文字
-        </div>
         <textarea id="noteQ" class="noteq" spellcheck="false"
           placeholder="输入要查找的内容，例如：粘滞时间"></textarea>
-        <div class="tip" style="margin-top:6px">
-          多个词用<b>空格</b>分隔 = 需<b>同时包含</b>（且）；英文不区分大小写。命中按「注释行」显示，行号与网页注释行序一致。
-        </div>
-        <label class="fuzzy" style="margin-top:6px"><input type="checkbox" id="showExN"> <span class="fz">包含被排除项（废弃 / 自定义 / 公式残条）</span></label>
+        <label class="fuzzy" style="margin-top:6px"><input type="checkbox" id="showExN"> <span class="fz">包含被排除项</span></label>
         <div class="actions">
-          <button class="btn pri" id="btnRunN">检 索</button>
-          <span class="tip" style="margin:0">回车执行 · Shift+回车换行</span>
+          <button class="btn pri" id="btnRunN">确认检索</button>
         </div>
         <div id="noteWarn"></div>
-        <div class="tip">
-          与 Tag 检索<b>互不影响</b>：两种模式各自保留输入与结果，切换时直接还原；
-          但<b>同一时间只展示其中一种</b>检索。
+      </div>
+    </div>
+
+    <div class="card" id="paneBonus" style="display:none">
+      <div class="hd"><h2>加成检索</h2><button class="btn link" id="btnClearB">清空</button></div>
+      <div class="bd">
+        <div id="bonusTags" class="bonuslist"></div>
+        <label class="fuzzy" style="margin-top:6px"><input type="checkbox" id="showExB"> <span class="fz">包含被排除项</span></label>
+        <div class="actions">
+          <button class="btn pri" id="btnRunB">确认检索</button>
         </div>
+        <div id="bonusWarn"></div>
+      </div>
+    </div>
+
+    <div class="card" id="paneValue" style="display:none">
+      <div class="hd"><h2>数值检索</h2><button class="btn link" id="btnClearV">清空</button></div>
+      <div class="bd">
+        <div class="vinputwrap">
+          <input id="valueTag" class="noteq" style="min-height:auto;resize:none" placeholder="输入 tag 名称，从候选中按 id 选择" autocomplete="off" spellcheck="false">
+          <div id="valueCands" class="valcands" hidden></div>
+        </div>
+        <div id="valueTagList" style="margin-top:6px;font-size:12px;color:var(--sub)"></div>
+        <label class="fuzzy" style="margin-top:6px"><input type="checkbox" id="showExV"> <span class="fz">包含被排除项</span></label>
+        <div class="actions">
+          <button class="btn pri" id="btnRunV">确认检索</button>
+        </div>
+        <div id="valueWarn"></div>
       </div>
     </div>
   </aside>
@@ -405,6 +497,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         <span class="sp"></span>
         <button class="btn" id="btnView" title="切换列表展示：简洁（仅升级图标 + 技能名）/ 详细（含命中详情）">☰ 简洁展示</button>
         <button class="btn" id="btnCsv" disabled>导出 CSV</button>
+        <div class="qcond" id="qCond" style="display:none"></div>
       </div>
       <div class="tblbox" id="tblbox">
         <div class="empty">在左侧输入 tag 名称后点击「检索」</div>
@@ -455,52 +548,99 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         <div class="tip">支持 <code>_raw.json</code>（书签抓取的原始结果）与 <code>data.js</code>；成功后会自动下载一份最新 <code>data.js</code>。</div>
       </div>
 
-      <details class="mk">
-        <summary>方式三　本机服务一键更新（仅维护者，需 bsk + 已登录浏览器）</summary>
-        <div class="actions" style="margin-top:0">
-          <button class="btn pri" id="updRun">开始更新</button>
-          <span class="st" id="updTip"></span>
-        </div>
-        <div class="svcline">更新服务地址
-          <input id="updSvc" spellcheck="false" placeholder="http://127.0.0.1:8899">
-          <button class="btn" id="updTest">测试连接</button>
-          <span class="st" id="updSt">—</span>
-        </div>
-        <div class="tip">
-          页面自己跨站 fetch 后台接口只会拿到「未登录」，所以由本机 <code>serve.py</code> 调用 bsk，
-          在<b>已登录的 partner 标签页内</b>抓取。双击 <code>start.bat</code> 启动服务；或直接跑 <code>refresh.sh</code>／<code>refresh.bat</code>，
-          再回本页点「重新加载 data.js」。
-        </div>
-      </details>
-
       <div class="uplog" id="updLog" style="margin-top:0"></div>
       <input type="file" id="updFile" accept=".js,.json,application/json,text/javascript" style="display:none">
     </div>
   </div>
 </div>
 
+<div class="mask" id="icoMask">
+  <div class="modal" style="max-width:780px">
+    <div class="mhd"><h3>更新本地图标</h3><button class="btn" id="icoClose">关闭</button></div>
+    <div class="mbd">
+
+      <div class="updsec">
+        <h4>一、复制的目标目录 <span class="tagm">只取 panorama\images 下这三个一级目录里的 png</span></h4>
+        <table class="dupTbl">
+          <thead><tr><th style="width:330px">目录（从 → 复制到）</th><th>放什么</th><th style="width:210px">文件名要求</th></tr></thead>
+          <tbody>
+            <tr><td><code>panorama\images\spellicons\</code> → <code>icons\spellicons\</code></td><td>英雄技能、野怪 / 建筑 / 召唤物技能图</td><td><code>&lt;技能代码名&gt;_png.png</code></td></tr>
+            <tr><td><code>panorama\images\items\</code> → <code>icons\items\</code></td><td>物品技能图（神符、魔晶 / 神杖升级等）</td><td><code>&lt;道具代码名&gt;_png.png</code></td></tr>
+            <tr><td><code>panorama\images\heroes\</code> → <code>icons\heroes\</code></td><td>英雄 / 中立单位小图标</td><td><code>&lt;单位代码名&gt;_png.png</code></td></tr>
+          </tbody>
+        </table>
+        <div class="tip">
+          技能代码名＝后台技能列表里的英文名（如 <code>antimage_mana_break</code>、<code>bottle_shield</code>），
+          <b>文件名必须是「代码名 + <code>_png.png</code>」</b>，多一个字母都认不出。
+        </div>
+      </div>
+
+      <div class="updsec">
+        <h4>二、操作步骤</h4>
+        <ol class="steps">
+          <li>把 png 复制进 <code>D:\wiki\tagsearch\icons\</code> 对应子目录，<b>文件名不要改</b>（改了就按新名字找）。</li>
+          <li>重建并刷新：回 <code>tagsearch</code> 目录<b>双击 <code>rebuild.bat</code></b>（等价于下面那三条命令），跑完回本页按 F5。</li>
+        </ol>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn pri" id="icoCopyCmd">复制重建命令</button>
+          <span class="st" id="icoCmdTip"></span>
+        </div>
+        <div class="tip">
+          顺序不能换：<code>local_icons.py</code> 读的是 <code>data.js</code>，必须先 <code>build_data.py</code> 让它看到最新技能表，
+          否则新技能拿不到图。
+        </div>
+        <div class="tip" style="margin-bottom:0">
+          第 2 步会顺带重建 <code>icons_b64.js</code>（约 7MB）：那是给<b>双击打开 index.html</b>（file://）时截图用的
+          图标内联包 —— 浏览器不允许 file:// 页面读本地图片像素，只能把图标预先变成 <code>data:</code> 再塞进图里。
+          少了它，双击打开截图会提示「缺少 icons_b64.js」。<br>
+          想手敲命令的话别直接敲 <code>python</code>：cmd 里它常常指向 Cygwin 的 3.6（没有 Pillow，会报错），
+          双击 <code>rebuild.bat</code> 会自动挑一个可用的 Python。
+        </div>
+      </div>
+
+      <div class="updsec dim">
+        <h4>三、图名和代码名对不上怎么办</h4>
+        <ol class="steps">
+          <li><b>长期生效</b>：在 <code>scripts\icon_overrides.json</code> 里加一行 <code>"技能代码名": "图标名"</code>
+              （例 <code>"Activate Shield Rune": "bottle_shield_png"</code>），重建后全库按它取图。</li>
+          <li><b>临时指定</b>：在缺图清单 md 的「图片名称」列填图标名，脚本同样会读（可少写 <code>_png</code>）。</li>
+          <li><b>确实没有专属图</b>：什么都不用放，技能会自动用 <code>other_icons\dota2_exe_png.png</code>；
+              先天技能用 <code>other_icons\innate_icon_png.png</code>。想换这两张，直接覆盖同名文件即可，全库立即生效。</li>
+          <li><b>查还缺什么</b>：看 <code>icons\missing.json</code>，<code>"count": 0</code> 表示每条技能都有图了。</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <datalist id="tagOptions"></datalist>
 
 <!-- BKMK_BEGIN -->
 <!-- 抓取书签代码：由 scripts/build_bookmarklet.py 从
      scripts/fetch_tagdb.bookmarklet.js 生成，请勿手改本块 -->
-<script type="text/plain" id="bkmkSrc">(async function () { 'use strict'; var D = document; if (!/^partner\.dota2\.com\.cn$/i.test(location.hostname)) { alert('请先在已登录的 partner.dota2.com.cn 后台页面使用本抓取书签。'); return; } var box = D.getElementById('__tsbkBox'); if (!box) { box = D.createElement('div'); box.id = '__tsbkBox'; box.setAttribute('style', 'position:fixed;right:18px;bottom:18px;z-index:2147483647;width:336px;' + 'background:#101418;color:#e8eef5;border:1px solid #2c3946;border-radius:10px;padding:12px 14px;' + 'font:13px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.45)'); D.body.appendChild(box); } function paint(title, body, ok) { box.innerHTML = '<div style="font-weight:600;color:' + (ok === false ? '#ff9d9d' : ok ? '#8fe3a8' : '#cfe3ff') + ';margin-bottom:4px">' + title + '</div><div style="opacity:.85">' + body + '</div>'; } function step(t) { paint('正在抓取后台数据…', t); } step('准备中…'); function jarr(v) { if (v == null || v === '') return []; if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return []; } function ids(v) { if (v == null || v === '') return []; var out = [], arr = jarr(v); if (arr.length) { arr.forEach(function (x) { var n = parseInt(x, 10); if (!isNaN(n) && n > 0) out.push(n); }); return out; } if (typeof v === 'string') { v.split(',').forEach(function (t) { var n = parseInt(t, 10); if (!isNaN(n) && n > 0) out.push(n); }); } return out; } function pack(x) { var eff = jarr(x.skill_effect).map(function (e) { return { n: e.effect_input || '', t: ids(e.effect_tag) }; }); var mech = [], feat = []; jarr(x.skill_mechanism).forEach(function (mm) { var n = parseInt(mm.mechanism_tag, 10); if (isNaN(n) || n <= 0) return; mech.push(n); feat.push({ i: n, c: String(mm.mechanism_input == null ? '' : mm.mechanism_input) }); }); return { i: x.id, n: x.name_zh || '', en: x.name_en || '', d: ids(x.skill_detail), g: ids(x.tags), m: mech, f: feat, e: eff, note: String(x.skill_notes == null ? '' : x.skill_notes), cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim(), ut: parseInt(x.update_time, 10) || 0 }; } function getJSON(url, opt) { var o = opt || { credentials: 'include' }; if (!o.credentials) o.credentials = 'include'; return fetch(url, o).then(function (r) { if (r.status === 401 || r.status === 403) throw new Error('未登录或登录已过期（HTTP ' + r.status + '）'); if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + url); return r.json(); }).then(function (j) { if (j && typeof j.code === 'number' && j.code !== 0) { throw new Error('接口返回 code=' + j.code + (j.msg ? '（' + j.msg + '）' : '') + ' —— 请确认已登录后台'); } return j; }); } try { var tags = []; for (var p = 1; p <= 50; p++) { step('Tag 第 ' + p + ' 页…（已 ' + tags.length + ' 条）'); var j = await getJSON('/apg/admin/mechanism/list?page=' + p); var L = (j.data && j.data.list) || (j.data && j.data.data) || []; if (!L.length) break; L.forEach(function (t) { tags.push({ id: t.id, name: t.name, c1: t.cate1 || '', c2: t.cate2 || '', sort: t.sort, pid: t.pid }); }); } var abs = [], pages = 0; for (var p2 = 1; p2 <= 50; p2++) { step('技能第 ' + p2 + ' 页…（已 ' + abs.length + ' 条 / Tag ' + tags.length + '）'); var j2 = await getJSON('/apg/admin/hero/ability?page=' + p2); var L2 = (j2.data && j2.data.list) || []; pages = p2; if (!L2.length) break; L2.forEach(function (x) { abs.push(pack(x)); }); } var items = [], ipages = 0; for (var p3 = 1; p3 <= 30; p3++) { step('物品技能第 ' + p3 + ' 页…（已 ' + items.length + ' 条 / 技能 ' + abs.length + ' 条）'); var j3 = await getJSON('/apg/admin/item/ability?page=' + p3 + '&page_size=100'); var L3 = (j3.data && j3.data.list) || []; ipages = p3; if (!L3.length) break; L3.forEach(function (x) { items.push(pack(x)); }); if (L3.length < 100) break; } var itemRefs = [], itemDataCount = 0; try { var refSet = {}; for (var p4 = 1; p4 <= 12; p4++) { step('道具数据第 ' + p4 + ' 页…（现版本技能引用 ' + Object.keys(refSet).length + '）'); var j4 = await getJSON('/apg/admin/item/list?page=' + p4 + '&page_size=100'); var L4 = (j4.data && j4.data.list) || []; if (!L4.length) break; itemDataCount += L4.length; L4.forEach(function (it) { var c1 = String(it.cate1 == null ? '' : it.cate1).trim(); if (!c1) return; if (c1 === '已移除物品' || c1 === '未发布物品') return; var am = it.ability_map; if (Array.isArray(am)) { am.forEach(function (x) { var n = parseInt(x, 10); if (n > 0) refSet[n] = 1; }); } else { String(am == null ? '' : am).split(',').forEach(function (s) { var n = parseInt(s.trim(), 10); if (n > 0) refSet[n] = 1; }); } }); if (L4.length < 100) break; } itemRefs = Object.keys(refSet).map(function (k) { return parseInt(k, 10); }).sort(function (a, b) { return a - b; }); } catch (e) { itemRefs = []; } var heroes = []; try { step('英雄名册…（技能已 ' + abs.length + ' 条）'); var jh = await getJSON('/apg/admin/hero/list', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }); var LH = Array.isArray(jh.data) ? jh.data : ((jh.data && jh.data.list) || []); LH.forEach(function (h) { heroes.push({ i: h.id, zh: h.name_zh || '', en: h.name_en || '', a: h.attribute_primary || '', s: ids(h.ability_map) }); }); } catch (e) { heroes = []; } if (!tags.length || !abs.length) throw new Error('抓到的数据为空 —— 请确认已登录后台并有编辑权限'); step('生成文件…'); var creepRefs = ["creep_siege","creep_irresolute","creep_piercing","flagbearer_creep_aura_effect","chen_martyrdom","neutral_upgrade","mud_golem_hurl_boulder","ghost_frost_attack","alpha_wolf_command_aura","alpha_wolf_critical_strike","ancient_rock_golem_weakening_aura","berserker_troll_break","big_thunder_lizard_frenzy","big_thunder_lizard_slam","big_thunder_lizard_wardrums_aura","black_dragon_dragonhide_aura","black_dragon_fireball","black_dragon_splash_attack","black_drake_magic_amplification_aura","centaur_khan_endurance_aura","centaur_khan_war_stomp","dark_troll_warlord_ensnare","dark_troll_warlord_raise_dead","enraged_wildkin_hurricane","abyssal_underlord_portal_warp","twin_gate_portal_warp","ability_capture","ability_lamp_use","enraged_wildkin_tornado","enraged_wildkin_toughness_aura","fel_beast_haunt","forest_troll_high_priest_heal","forest_troll_high_priest_heal_amp_aura","forest_troll_high_priest_mana_aura","frostbitten_golem_time_warp_aura","furbolg_enrage_attack_speed","furbolg_enrage_damage","giant_wolf_intimidate","gnoll_assassin_envenomed_weapon","granite_golem_hp_aura","harpy_scout_take_off","harpy_storm_chain_lightning","ice_shaman_incendiary_bomb","kobold_disarm","kobold_taskmaster_speed_aura","kobold_tunneler_prospecting","mud_golem_rock_destroy","mudgolem_cloak_aura","ogre_bruiser_ogre_smash","ogre_magi_frost_armor","polar_furbolg_ursa_warrior_thunder_clap","roshan_bash","roshan_devotion","roshan_spell_block","roshan_slam","roshan_inherent_buffs","satyr_hellcaller_shockwave","satyr_hellcaller_unholy_aura","satyr_soulstealer_mana_burn","satyr_trickster_purge","spawnlord_aura","spawnlord_master_freeze","spawnlord_master_stomp","warpine_raider_seed_shot","neutral_spell_immunity","beastmaster_boar_poison","beastmaster_hawk_dive","broodmother_poison_sting","broodmother_spawn_spiderite","forged_spirit_melting_strike","undying_tombstone_zombie_deathstrike","hill_troll_rally","necronomicon_archer_aoe","necronomicon_warrior_last_will","necronomicon_warrior_mana_burn","warlock_imp_explode","skeleton_king_bone_guard_damage_tracker","brewmaster_primal_split_cancel","brewmaster_earth_hurl_boulder","brewmaster_earth_pulverize","brewmaster_earth_spell_immunity","brewmaster_fire_permanent_immolation","brewmaster_fire_phase","brewmaster_storm_cyclone","brewmaster_storm_dispel_magic","brewmaster_storm_wind_walk","elder_titan_echo_stomp_spirit","elder_titan_natural_order_spirit","lone_druid_savage_roar_bear","lone_druid_spirit_bear_demolish","lone_druid_spirit_bear_entangle","lone_druid_spirit_bear_return","visage_summon_familiars_recall","visage_summon_familiars_stone_form","warlock_golem_flaming_fists","warlock_golem_permanent_immolation","tornado_tempest","broodmother_spin_web_destroy","techies_remote_mines_self_detonate","templar_assassin_self_trap","courier_burst","courier_shield","backdoor_protection","backdoor_protection_in_base","tower_aura","tower_truesight_aura","invulnerable","armor_per_barracks","fountain_passive","fountain_aura","fountain_invulnerability"]; var payload = { ok: true, fetchedAt: new Date().toISOString(), tagCount: tags.length, abilityCount: abs.length, itemCount: items.length, heroCount: heroes.length, itemDataCount: itemDataCount, itemRefCount: itemRefs.length, pages: pages, itemPages: ipages, tags: tags, abilities: abs, items: items, heroes: heroes, itemRefs: itemRefs, creepRefs: creepRefs }; var txt = JSON.stringify(payload); var sizeKB = Math.round(txt.length / 1024); var url = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); var a = D.createElement('a'); a.href = url; a.download = '_raw.json'; a.style.display = 'none'; D.body.appendChild(a); a.click(); D.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 30000); paint('✓ 已下载 _raw.json（' + sizeKB + ' KB）', 'Tag ' + tags.length + ' 条 · 技能 ' + abs.length + ' 条 · 英雄 ' + heroes.length + ' 个<br>' + '下一步：打开检索器 → 右上角「⟳ 更新本地数据」→「选择文件载入…」→ 选刚下载的 _raw.json' + '<br><span style="opacity:.6">本浮层不会自动关闭，可手动关掉浏览器标签或刷新页面。</span>', true); } catch (e) { paint('✗ 抓取失败', (e && e.message ? e.message : String(e)) + '<br><span style="opacity:.7">若提示未登录，请先登录后台再点书签；' + '若书签被浏览器拦截（CSP），可在后台页按 F12 打开控制台，把书签代码粘贴进去回车。</span>', false); } })();</script>
+<script type="text/plain" id="bkmkSrc">(async function () { 'use strict'; var D = document; if (!/^partner\.dota2\.com\.cn$/i.test(location.hostname)) { alert('请先在已登录的 partner.dota2.com.cn 后台页面使用本抓取书签。'); return; } var box = D.getElementById('__tsbkBox'); if (!box) { box = D.createElement('div'); box.id = '__tsbkBox'; box.setAttribute('style', 'position:fixed;right:18px;bottom:18px;z-index:2147483647;width:336px;' + 'background:#101418;color:#e8eef5;border:1px solid #2c3946;border-radius:10px;padding:12px 14px;' + 'font:13px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.45)'); D.body.appendChild(box); } function paint(title, body, ok) { box.innerHTML = '<div style="font-weight:600;color:' + (ok === false ? '#ff9d9d' : ok ? '#8fe3a8' : '#cfe3ff') + ';margin-bottom:4px">' + title + '</div><div style="opacity:.85">' + body + '</div>'; } function step(t) { paint('正在抓取后台数据…', t); } step('准备中…'); function jarr(v) { if (v == null || v === '') return []; if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return []; } function ids(v) { if (v == null || v === '') return []; var out = [], arr = jarr(v); if (arr.length) { arr.forEach(function (x) { var n = parseInt(x, 10); if (!isNaN(n) && n > 0) out.push(n); }); return out; } if (typeof v === 'string') { v.split(',').forEach(function (t) { var n = parseInt(t, 10); if (!isNaN(n) && n > 0) out.push(n); }); } return out; } function jobj(v) { if (v && typeof v === 'object' && !Array.isArray(v)) return v; if (typeof v === 'string') { try { var o = JSON.parse(v); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; } catch (e) { return {}; } } return {}; } function bonusItems(v) { var s = jobj(v), arr = s.ability_special_map_front, out = [], seen = {}; if (!Array.isArray(arr) || !arr.length) { arr = []; Object.keys(s).forEach(function (k) { if (!/_custom_name$/.test(k)) return; var f = k.replace(/_custom_name$/, ''); arr.push({ customName: s[k], isShow: s[f + '_is_show'], fieldBack: k }); }); } arr.forEach(function (it) { if (it.isShow != null && parseInt(it.isShow, 10) !== 1) return; var nm = String(it.customName == null ? '' : it.customName), ids = [], mm; var re = /\{%(\d+)%\}/g; while ((mm = re.exec(nm)) !== null) { var id = parseInt(mm[1], 10); if (bonusIds[id] && ids.indexOf(id) < 0) ids.push(id); } if (!ids.length) return; var k = String(it.fieldBack || ''), key = k + '|' + nm; if (seen[key]) return; seen[key] = 1; out.push({ k: k, n: nm, t: ids }); }); return out; } /** 数值数据项（2026-11-27 数值检索）：所有「自定义中文名 + 数值」的项。 * 数值口径（用户定）：常规值 = 前缀 + valueFront + 后缀；手填值(custom_covervalue) = 原样，不加前后缀。 * 紧凑格式 vx=[[名称, 数值文本, 前缀, 后缀, 手填标志, [关联tag id…], [替换符tag id…]], …] * ⚠ 物品技能无 is_show / front 恒空：无开关字段视为开启（同 bonusItems）。 */ function valueItems(v) { var s = jobj(v), arr = s.ability_special_map_front, out = [], seen = {}; if (!Array.isArray(arr) || !arr.length) { arr = []; Object.keys(s).forEach(function (k) { if (!/_custom_name$/.test(k)) return; var f = k.replace(/_custom_name$/, ''); var it = { customName: s[k], fieldBack: f }; if (s[f + '_is_show'] != null) it.isShow = s[f + '_is_show']; if (s[f + '_custom_covervalue'] != null) it.customCoverValue = s[f + '_custom_covervalue']; if (s[f + '_custom_prefix'] != null) it.customPrefix = s[f + '_custom_prefix']; if (s[f + '_custom_suffix'] != null) it.customSuffix = s[f + '_custom_suffix']; var rt = s[f + '_custom_relatetag']; if (rt != null) it.customRelateTag = rt; arr.push(it); }); } arr.forEach(function (it) { if (it.isShow != null && parseInt(it.isShow, 10) !== 1) return; var nm = String(it.customName == null ? '' : it.customName).trim(); if (!nm || nm === '//') return; var f = String(it.fieldBack || '').replace(/_custom_name$/, ''); var cov = it.customCoverValue != null ? it.customCoverValue : s[f + '_custom_covervalue']; var hand = cov != null && String(cov).length > 0; var vf = it.valueFront != null ? it.valueFront : s[f + '_custom_value']; var raw = hand ? String(cov) : String(vf == null ? '' : vf); if (!raw.trim()) return; var pfx = hand ? '' : String(it.customPrefix == null ? '' : it.customPrefix); var sfx = hand ? '' : String(it.customSuffix == null ? '' : it.customSuffix); var val = pfx + raw + sfx; var rel = it.customRelateTag != null ? it.customRelateTag : s[f + '_custom_relatetag']; var relIds = []; if (Array.isArray(rel)) rel.forEach(function (x) { var id = parseInt(x, 10); if (id > 0 && relIds.indexOf(id) < 0) relIds.push(id); }); else if (rel != null) { var id1 = parseInt(rel, 10); if (id1 > 0) relIds.push(id1); } var phIds = [], mm, re = /\{%(\d+)%\}/g; while ((mm = re.exec(nm)) !== null) { var tid = parseInt(mm[1], 10); if (tid > 0 && phIds.indexOf(tid) < 0) phIds.push(tid); } var key = f + '|' + nm + '|' + val; if (seen[key]) return; seen[key] = 1; out.push([nm, val, pfx, sfx, hand ? 1 : 0, relIds, phIds]); }); return out; } function pack(x) { var eff = jarr(x.skill_effect).map(function (e) { return { n: e.effect_input || '', t: ids(e.effect_tag) }; }); var mech = [], feat = []; jarr(x.skill_mechanism).forEach(function (mm) { var n = parseInt(mm.mechanism_tag, 10); if (isNaN(n) || n <= 0) return; mech.push(n); feat.push({ i: n, c: String(mm.mechanism_input == null ? '' : mm.mechanism_input) }); }); return { i: x.id, n: x.name_zh || '', en: x.name_en || '', d: ids(x.skill_detail), g: ids(x.tags), m: mech, f: feat, e: eff, note: String(x.skill_notes == null ? '' : x.skill_notes), cp: String(x.ability_cast_point == null ? '' : x.ability_cast_point).trim(), ut: parseInt(x.update_time, 10) || 0, bx: bonusItems(x.ability_special_map), vx: valueItems(x.ability_special_map) }; } function getJSON(url, opt) { var o = opt || { credentials: 'include' }; if (!o.credentials) o.credentials = 'include'; return fetch(url, o).then(function (r) { if (r.status === 401 || r.status === 403) throw new Error('未登录或登录已过期（HTTP ' + r.status + '）'); if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + url); return r.json(); }).then(function (j) { if (j && typeof j.code === 'number' && j.code !== 0) { throw new Error('接口返回 code=' + j.code + (j.msg ? '（' + j.msg + '）' : '') + ' —— 请确认已登录后台'); } return j; }); } try { var tags = []; for (var p = 1; p <= 50; p++) { step('Tag 第 ' + p + ' 页…（已 ' + tags.length + ' 条）'); var j = await getJSON('/apg/admin/mechanism/list?page=' + p); var L = (j.data && j.data.list) || (j.data && j.data.data) || []; if (!L.length) break; L.forEach(function (t) { tags.push({ id: t.id, name: t.name, c1: t.cate1 || '', c2: t.cate2 || '', sort: t.sort, pid: t.pid }); }); } var bonusIds = {}; tags.forEach(function (t) { if ((t.c1 || '') === '图标' && (t.c2 || '') === '加成属性') bonusIds[t.id] = 1; }); var abs = [], pages = 0; for (var p2 = 1; p2 <= 50; p2++) { step('技能第 ' + p2 + ' 页…（已 ' + abs.length + ' 条 / Tag ' + tags.length + '）'); var j2 = await getJSON('/apg/admin/hero/ability?page=' + p2); var L2 = (j2.data && j2.data.list) || []; pages = p2; if (!L2.length) break; L2.forEach(function (x) { abs.push(pack(x)); }); } var items = [], ipages = 0; for (var p3 = 1; p3 <= 30; p3++) { step('物品技能第 ' + p3 + ' 页…（已 ' + items.length + ' 条 / 技能 ' + abs.length + ' 条）'); var j3 = await getJSON('/apg/admin/item/ability?page=' + p3 + '&page_size=100'); var L3 = (j3.data && j3.data.list) || []; ipages = p3; if (!L3.length) break; L3.forEach(function (x) { items.push(pack(x)); }); if (L3.length < 100) break; } var itemRefs = [], itemDataCount = 0; try { var refSet = {}; for (var p4 = 1; p4 <= 12; p4++) { step('道具数据第 ' + p4 + ' 页…（现版本技能引用 ' + Object.keys(refSet).length + '）'); var j4 = await getJSON('/apg/admin/item/list?page=' + p4 + '&page_size=100'); var L4 = (j4.data && j4.data.list) || []; if (!L4.length) break; itemDataCount += L4.length; L4.forEach(function (it) { var c1 = String(it.cate1 == null ? '' : it.cate1).trim(); if (!c1) return; if (c1 === '已移除物品' || c1 === '未发布物品') return; var am = it.ability_map; if (Array.isArray(am)) { am.forEach(function (x) { var n = parseInt(x, 10); if (n > 0) refSet[n] = 1; }); } else { String(am == null ? '' : am).split(',').forEach(function (s) { var n = parseInt(s.trim(), 10); if (n > 0) refSet[n] = 1; }); } }); if (L4.length < 100) break; } itemRefs = Object.keys(refSet).map(function (k) { return parseInt(k, 10); }).sort(function (a, b) { return a - b; }); } catch (e) { itemRefs = []; } var heroes = []; try { step('英雄名册…（技能已 ' + abs.length + ' 条）'); var jh = await getJSON('/apg/admin/hero/list', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }); var LH = Array.isArray(jh.data) ? jh.data : ((jh.data && jh.data.list) || []); LH.forEach(function (h) { heroes.push({ i: h.id, zh: h.name_zh || '', en: h.name_en || '', a: h.attribute_primary || '', s: ids(h.ability_map) }); }); } catch (e) { heroes = []; } if (!tags.length || !abs.length) throw new Error('抓到的数据为空 —— 请确认已登录后台并有编辑权限'); step('生成文件…'); var creepRefs = ["creep_siege","creep_irresolute","creep_piercing","flagbearer_creep_aura_effect","chen_martyrdom","neutral_upgrade","mud_golem_hurl_boulder","ghost_frost_attack","alpha_wolf_command_aura","alpha_wolf_critical_strike","ancient_rock_golem_weakening_aura","berserker_troll_break","big_thunder_lizard_frenzy","big_thunder_lizard_slam","big_thunder_lizard_wardrums_aura","black_dragon_dragonhide_aura","black_dragon_fireball","black_dragon_splash_attack","black_drake_magic_amplification_aura","centaur_khan_endurance_aura","centaur_khan_war_stomp","dark_troll_warlord_ensnare","dark_troll_warlord_raise_dead","enraged_wildkin_hurricane","abyssal_underlord_portal_warp","twin_gate_portal_warp","ability_capture","ability_lamp_use","enraged_wildkin_tornado","enraged_wildkin_toughness_aura","fel_beast_haunt","forest_troll_high_priest_heal","forest_troll_high_priest_heal_amp_aura","forest_troll_high_priest_mana_aura","frostbitten_golem_time_warp_aura","furbolg_enrage_attack_speed","furbolg_enrage_damage","giant_wolf_intimidate","gnoll_assassin_envenomed_weapon","granite_golem_hp_aura","harpy_scout_take_off","harpy_storm_chain_lightning","ice_shaman_incendiary_bomb","kobold_disarm","kobold_taskmaster_speed_aura","kobold_tunneler_prospecting","mud_golem_rock_destroy","mudgolem_cloak_aura","ogre_bruiser_ogre_smash","ogre_magi_frost_armor","polar_furbolg_ursa_warrior_thunder_clap","roshan_bash","roshan_devotion","roshan_spell_block","roshan_slam","roshan_inherent_buffs","satyr_hellcaller_shockwave","satyr_hellcaller_unholy_aura","satyr_soulstealer_mana_burn","satyr_trickster_purge","spawnlord_aura","spawnlord_master_freeze","spawnlord_master_stomp","warpine_raider_seed_shot","neutral_spell_immunity","beastmaster_boar_poison","beastmaster_hawk_dive","broodmother_poison_sting","broodmother_spawn_spiderite","forged_spirit_melting_strike","undying_tombstone_zombie_deathstrike","hill_troll_rally","necronomicon_archer_aoe","necronomicon_warrior_last_will","necronomicon_warrior_mana_burn","warlock_imp_explode","skeleton_king_bone_guard_damage_tracker","brewmaster_primal_split_cancel","brewmaster_earth_hurl_boulder","brewmaster_earth_pulverize","brewmaster_earth_spell_immunity","brewmaster_fire_permanent_immolation","brewmaster_fire_phase","brewmaster_storm_cyclone","brewmaster_storm_dispel_magic","brewmaster_storm_wind_walk","elder_titan_echo_stomp_spirit","elder_titan_natural_order_spirit","lone_druid_savage_roar_bear","lone_druid_spirit_bear_demolish","lone_druid_spirit_bear_entangle","lone_druid_spirit_bear_return","visage_summon_familiars_recall","visage_summon_familiars_stone_form","warlock_golem_flaming_fists","warlock_golem_permanent_immolation","tornado_tempest","broodmother_spin_web_destroy","techies_remote_mines_self_detonate","templar_assassin_self_trap","courier_burst","courier_shield","backdoor_protection","backdoor_protection_in_base","tower_aura","tower_truesight_aura","invulnerable","armor_per_barracks","fountain_passive","fountain_aura","fountain_invulnerability","watch_tower_invulnerable","invulnerable_hidden","watch_tower","watcher_state","twin_gate_fx","passive_lotus_pool","passive_lotus_pool_building","xp_fountain_aura","xp_fountain_building","attribute_bonus","fountain_glyph","fountain_buyback","radar"]; var payload = { ok: true, fetchedAt: new Date().toISOString(), tagCount: tags.length, abilityCount: abs.length, itemCount: items.length, heroCount: heroes.length, itemDataCount: itemDataCount, itemRefCount: itemRefs.length, pages: pages, itemPages: ipages, tags: tags, abilities: abs, items: items, heroes: heroes, itemRefs: itemRefs, creepRefs: creepRefs }; var txt = JSON.stringify(payload); var sizeKB = Math.round(txt.length / 1024); var url = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); var a = D.createElement('a'); a.href = url; a.download = '_raw.json'; a.style.display = 'none'; D.body.appendChild(a); a.click(); D.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 30000); paint('✓ 已下载 _raw.json（' + sizeKB + ' KB）', 'Tag ' + tags.length + ' 条 · 技能 ' + abs.length + ' 条 · 英雄 ' + heroes.length + ' 个<br>' + '下一步：打开检索器 → 右上角「⟳ 更新本地数据」→「选择文件载入…」→ 选刚下载的 _raw.json' + '<br><span style="opacity:.6">本浮层不会自动关闭，可手动关掉浏览器标签或刷新页面。</span>', true); } catch (e) { paint('✗ 抓取失败', (e && e.message ? e.message : String(e)) + '<br><span style="opacity:.7">若提示未登录，请先登录后台再点书签；' + '若书签被浏览器拦截（CSP），可在后台页按 F12 打开控制台，把书签代码粘贴进去回车。</span>', false); } })();</script>
 <!-- BKMK_END -->
 
 <script src="data.js"></script>
 <script src="search-core.js"></script>
+<script src="shot.js"></script>
 <script>
 (function () {
   'use strict';
   var DB = window.TAGDB;
+  var IMGMAP = {};                   // 技能 id → {s:技能图标, u:单位图标}（data.js 的 imgMap，本地图片相对路径）
   var core = window.TagSearch;
   var idx = null;
   var NODATA = false;                // 启动时没找到 data.js（界面改为引导语，且允许载入文件）
-  var MODE = 'tag';                  // 'tag' Tag 检索 | 'note' 注释检索 —— 同一时间只展示一种
+  var MODE = 'tag';                  // 'tag' Tag 检索 | 'note' 注释检索 | 'bonus' 加成检索 | 'value' 数值检索 —— 同一时间只展示一种
   // 两种模式各自的上次检索（{query, result}），互不影响；*Had 记录「是否成功检索过」，
   // 供「技能来源」从空恢复勾选时决定要不要自动重跑
-  var S = { tag: null, note: null, tagHad: false, noteHad: false };
+  var S = { tag: null, note: null, bonus: null, value: null,
+           tagHad: false, noteHad: false, bonusHad: false, valueHad: false };
   var viewMode = 'full';   // 'full' 详细（默认） | 'compact' 简洁（仅升级图标 + 技能名）
+  var VALUE_TAG_COUNTS = {}; // tag id → 数值数据项命中数（候选列表展示用）
   var EXLABEL = {};
   var EXTIP = {};
   (core.EXCLUDE_KINDS || []).forEach(function (k) { EXLABEL[k.key] = k.label; EXTIP[k.key] = k.tip; });
@@ -524,8 +664,10 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     NODATA = true;
     DB = { fetchedAt: '', tags: [], abilities: [], heroes: [], featText: {}, notePool: [] };
   }
+  IMGMAP = DB.imgMap || {};
   idx = core.createIndex(DB);
   setMeta();
+  rebuildValueTagCounts();
 
   var dl = $('tagOptions');
   fillTagOptions();
@@ -621,12 +763,15 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   function srcChanged() {
     renderSrcList();
     updateExpr();
-    var qt = MODE !== 'tag', qn = MODE !== 'note';
+    var qt = MODE !== 'tag', qn = MODE !== 'note', qb = MODE !== 'bonus';
     if (S.tag) runTag(qt);
     if (S.note) runNote(qn);
+    if (S.bonus) runBonus(qb);
     // 当前模式没有可显示的结果时：来源有效且（之前检索过 / 来源确实缩小了范围）→ 直接重跑一次
     if (!S.tag && MODE === 'tag' && readSources().length && (S.tagHad || !srcAllOn())) runTag(false);
     if (!S.note && MODE === 'note' && readSources().length && (S.noteHad || !srcAllOn())) runNote(false);
+    if (!S.bonus && MODE === 'bonus' && readSources().length && (S.bonusHad || !srcAllOn())) runBonus(false);
+    if (!S.value && MODE === 'value' && readSources().length && (S.valueHad || !srcAllOn())) runValue(false);
     redraw();
   }
 
@@ -651,12 +796,15 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
    *  quiet = true 时只重算并存结果，不渲染（避免把另一模式的结果画到当前表格里） */
   function heroChanged() {
     updateExpr();
-    var qt = MODE !== 'tag', qn = MODE !== 'note';
+    var qt = MODE !== 'tag', qn = MODE !== 'note', qb = MODE !== 'bonus';
     if (S.tag) runTag(qt);
     if (S.note) runNote(qn);
+    if (S.bonus) runBonus(qb);
     // 还没检索过、但已有英雄条件 → 直接把当前模式跑一次
     if (!S.tag && MODE === 'tag' && heroSel.size) runTag(false);
     if (!S.note && MODE === 'note' && heroSel.size) runNote(false);
+    if (!S.bonus && MODE === 'bonus' && heroSel.size) runBonus(false);
+    if (!S.value && MODE === 'value' && heroSel.size) runValue(false);
     redraw();
   }
 
@@ -674,9 +822,19 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
 
   function readHeroes() { return Array.from(heroSel); }
 
-  /** 结果表「技能」格下的英雄行（无归属则不显示）；非英雄来源改为显示来源名（如「物品技能」「目录外技能」） */
+  /** 卡片第二行：英雄技能 → 英雄名；非英雄单位技能 → **原主单位**（《非英雄单位技能.md》原主列，
+   *  查不到原主时整行留空，不再显示「现版本非英雄单位技能」这种来源标签）；物品技能 → **物品名**
+   *  （构建时写入 a.in，2026-11-27 用户定，不再显示「现版本物品技能」来源标签） */
   function heroLine(h) {
     var key = core.srcOf(h && h.ability);
+    if (key === 'creep') {
+      var own = (h && h.ability && h.ability.o) || '';
+      return own ? '<div class="hr">' + esc(own) + '</div>' : '';
+    }
+    if (key === 'item' || key === 'itemOld') {
+      var inm = (h && h.ability && h.ability.in) || '';
+      return inm ? '<div class="hr">' + esc(inm) + '</div>' : '';
+    }
     if (key !== 'hero') return '<div class="hr">' + esc(srcMeta(key).label) + '</div>';
     var hs = h && h.heroes;
     if (!hs || !hs.length) return '';
@@ -776,7 +934,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   }
 
   function scope() {
-    return { d: $('scD').checked, e: $('scE').checked, m: $('scM').checked, g: $('scG').checked };
+    return { d: $('scD').checked, e: $('scE').checked, m: $('scM').checked };
   }
 
   /** 读「施法前摇」区间输入：返回 {min, max, swapped}，空串 = 该侧不限 */
@@ -837,11 +995,12 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
         $('tblbox').innerHTML = '<div class="empty">请至少输入一个 tag，或设置「施法前摇」区间</div>';
         $('nHit').textContent = '0'; $('nScan').textContent = '';
         $('btnCsv').disabled = true;
+        setQCond();
       }
       S.tag = null;
       return;
     }
-    if (tags && !q.scope.d && !q.scope.e && !q.scope.m && !q.scope.g) {
+    if (tags && !q.scope.d && !q.scope.e && !q.scope.m) {
       if (!quiet) $('tblbox').innerHTML = '<div class="empty">请至少选择一个「匹配范围」</div>';
       return;
     }
@@ -882,8 +1041,208 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     if (!quiet) renderNote(r);
   }
 
+  // ---------- 检索（加成模式：数据项名称里的替换符，单选 tag） ----------
+  /** 左栏 7 个加成属性 tag 单选列表；计数取自最近一次检索的 counts（未检索时留空） */
+  function renderBonusTags() {
+    var list = core.bonusTags(idx);
+    var counts = (S.bonus && S.bonus.result && S.bonus.result.counts) || {};
+    var cur = (S.bonus && S.bonus.query && S.bonus.query.tag) || 0;
+    if (!list.length) {
+      $('bonusTags').innerHTML = '<div class="tip">当前 data.js 不含加成属性 tag，请重新抓取数据。</div>';
+      return;
+    }
+    $('bonusTags').innerHTML = list.map(function (t) {
+      var c = counts[t.id];
+      return '<label' + (cur === t.id ? ' class="on"' : '') + '>' +
+        '<input type="radio" name="bonusTag" value="' + t.id + '"' + (cur === t.id ? ' checked' : '') + '>' +
+        '<span class="bn">' + esc(t.name) + '</span>' +
+        '<span class="bid">{%' + t.id + '%}</span>' +
+        '<span class="bc">' + (c ? (c.skills + ' 技 / ' + c.items + ' 项') : '') + '</span></label>';
+    }).join('');
+  }
+
+  function runBonus(quiet) {
+    quiet = (quiet === true);
+    var chosen = document.querySelector('input[name="bonusTag"]:checked');
+    var q = {
+      tag: chosen ? (parseInt(chosen.value, 10) || 0) : 0,
+      includeExcluded: $('showExB').checked,
+      heroes: readHeroes(), sources: readSources()
+    };
+    if (!q.sources.length) {
+      if (!quiet) showSrcBlock();
+      S.bonus = null;
+      return;
+    }
+    if (!q.tag) {
+      if (!quiet) {
+        $('tblbox').innerHTML = '<div class="empty">请在左侧选择一个加成属性 tag</div>';
+        $('nHit').textContent = '0'; $('nScan').textContent = '';
+        $('btnCsv').disabled = true;
+      }
+      S.bonus = null;
+      renderBonusTags();
+      return;
+    }
+    var r = core.searchBonus(idx, q);
+    S.bonus = { query: q, result: r };
+    S.bonusHad = true;
+    renderBonusTags();
+    if (!quiet) renderBonus(r);
+  }
+
+  /** 数值检索：按输入的 tag 名称 / id 检索数据项（名称 + 数值） */
+  function readValueTags() {
+    return String($('valueTag').value || '').split(/[,，、\s]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+  }
+
+  /* ---------- 数值检索：输入时给出 tag 候选，由用户按 id 匹配 ----------
+   * 候选点击后写入纯数字 tag id（内核 resolveTagIds 对纯数字走 id 精确解析），
+   * 避免同名 / 包含匹配把「物品威力」自动扩成 4 个 tag。 */
+  var VALUE_CAND_LIMIT = 40;
+  var valueCandState = { list: [], active: -1 };
+
+  function rebuildValueTagCounts() {
+    VALUE_TAG_COUNTS = {};
+    ((idx && idx.abilities) || []).forEach(function (a) {
+      ((a && a.vx) || []).forEach(function (it) {
+        if (!Array.isArray(it)) return;
+        [5, 6].forEach(function (pos) {
+          (Array.isArray(it[pos]) ? it[pos] : []).forEach(function (id) {
+            id = parseInt(id, 10);
+            if (id > 0) VALUE_TAG_COUNTS[id] = (VALUE_TAG_COUNTS[id] || 0) + 1;
+          });
+        });
+      });
+    });
+  }
+
+  function currentValueToken() {
+    var el = $('valueTag');
+    var caret = (typeof el.selectionStart === 'number') ? el.selectionStart : el.value.length;
+    var left = el.value.slice(0, caret);
+    var m = left.match(/([^,，、\s]+)$/);
+    var token = m ? m[1] : '';
+    return { token: token, start: caret - token.length, end: caret };
+  }
+
+  function valueCandidates(token) {
+    var q = String(token || '').trim().toLowerCase();
+    var seen = {}, out = [];
+    (((idx && idx.db) || {}).tags || []).forEach(function (t) {
+      if (!t || seen[t.id]) return;              // 后台有重复定义（如 1334）只列一次
+      var nm = String(t.name || '');
+      var c2 = String(t.c2 || ''), c1 = String(t.c1 || '');
+      var hay = (nm + ' ' + c1 + ' ' + c2).toLowerCase();
+      if (q && hay.indexOf(q) < 0 && String(t.id).indexOf(q) !== 0) return;
+      seen[t.id] = 1;
+      var gs = (idx.name2groups && idx.name2groups.get(nm)) || [];
+      var cat = c2;
+      for (var i = 0; i < gs.length; i++) {
+        if (gs[i].ids.indexOf(t.id) >= 0) { cat = gs[i].cat + (gs[i].variants.length ? '（含变体）' : ''); break; }
+      }
+      out.push({ id: t.id, name: nm, c1: c1, c2: cat, count: VALUE_TAG_COUNTS[t.id] || 0 });
+    });
+    out.sort(function (a, b) {
+      var ae = a.name.toLowerCase() === q ? 1 : 0, be = b.name.toLowerCase() === q ? 1 : 0;
+      return (be - ae) || (b.count - a.count) || (a.name.localeCompare(b.name, 'zh-Hans-CN')) || (a.id - b.id);
+    });
+    return out.slice(0, VALUE_CAND_LIMIT);
+  }
+
+  function renderValueCands(token) {
+    var box = $('valueCands');
+    if (!box || !token) { hideValueCands(); return; }
+    var list = valueCandidates(token);
+    valueCandState = { list: list, active: -1 };
+    if (!list.length) {
+      box.innerHTML = '<div class="vempty">没有匹配的 tag</div>';
+      box.hidden = false;
+      return;
+    }
+    box.innerHTML = list.map(function (t, i) {
+      return '<div class="vc" data-i="' + i + '">' +
+        '<span class="vid">' + t.id + '</span>' +
+        '<span class="vn">' + esc(t.name) + '</span>' +
+        '<span class="vcat">' + esc(t.c1 + (t.c2 ? ' / ' + t.c2 : '')) + '</span>' +
+        '<span class="vnitem">' + (t.count ? t.count + ' 项' : '0 项') + '</span></div>';
+    }).join('');
+    box.hidden = false;
+  }
+
+  function hideValueCands() {
+    var box = $('valueCands');
+    if (box) { box.hidden = true; box.innerHTML = ''; }
+    valueCandState = { list: [], active: -1 };
+  }
+
+  function highlightValueCand(n) {
+    var box = $('valueCands');
+    if (!box || box.hidden || !valueCandState.list.length) return;
+    var items = box.querySelectorAll('.vc');
+    if (!items.length) return;
+    valueCandState.active = (n + items.length) % items.length;
+    for (var i = 0; i < items.length; i++) items[i].classList.toggle('on', i === valueCandState.active);
+    var cur = items[valueCandState.active];
+    if (cur && typeof cur.scrollIntoView === 'function') cur.scrollIntoView({ block: 'nearest' });
+  }
+
+  function pickValueCand(i) {
+    var t = valueCandState.list[i];
+    if (!t) return;
+    var el = $('valueTag'), r = currentValueToken();
+    var val = el.value, rep = String(t.id);
+    el.value = val.slice(0, r.start) + rep + val.slice(r.end);
+    var caret = r.start + rep.length;
+    if (typeof el.setSelectionRange === 'function') el.setSelectionRange(caret, caret);
+    hideValueCands();
+    updateValueTagList(0);
+    el.focus();
+  }
+
+  function runValue(quiet) {
+    quiet = (quiet === true);
+    var tags = readValueTags();
+    var q = {
+      tags: tags,
+      includeExcluded: $('showExV').checked,
+      heroes: readHeroes(), sources: readSources()
+    };
+    if (!q.sources.length) {
+      if (!quiet) showSrcBlock();
+      S.value = null;
+      return;
+    }
+    if (!tags.length) {
+      if (!quiet) {
+        $('tblbox').innerHTML = '<div class="empty">请在左侧输入 tag 名称</div>';
+        $('nHit').textContent = '0'; $('nScan').textContent = '';
+        $('btnCsv').disabled = true;
+      }
+      S.value = null;
+      updateValueTagList(0);
+      return;
+    }
+    var r = core.searchValue(idx, q);
+    S.value = { query: q, result: r };
+    S.valueHad = true;
+    updateValueTagList(r.tags.length, r.tagNames, r.tagMiss);
+    if (!quiet) renderValue(r);
+  }
+  /** 显示已解析到的 tag 名称与未识别输入 */
+  function updateValueTagList(n, names, miss) {
+    var el = $('valueTagList');
+    if (!el) return;
+    if (!n && !names && !miss) { el.textContent = ''; return; }
+    var out = [];
+    if (names && names.length) out.push('识别到 <b>' + esc(names.join('、')) + '</b>');
+    else if (n) out.push('识别到 <b>' + n + '</b> 个 tag');
+    if (miss && miss.length) out.push('<span style="color:var(--not)">未识别：' + esc(miss.join('、')) + '</span>');
+    el.innerHTML = out.join('　');
+  }
+
   /** 升级项 chip：竖排「上图标 / 下中文名」，悬停显示网页条目全名与 wiki 占位符 */
-  function upgradeChips(list) {
+  function upgradeChips(list, inline) {
     if (!list || !list.length) return '<span class="count">—</span>';
     var out = list.map(function (id) {
       var m = core.UPGRADE_META[id] ||
@@ -896,7 +1255,8 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       return '<span class="up ' + m.cls + '" title="' + esc(tip) + '">' + ico +
         '<span class="lb">' + esc(m.label || m.full) + '</span></span>';
     }).join('');
-    return '<div class="ups">' + out + '</div>';
+    // inline=true → 用行内容器，供「与效果 chip 排在同一行」的场景（tag 检索卡片）使用
+    return inline ? '<span class="ups inl">' + out + '</span>' : '<div class="ups">' + out + '</div>';
   }
 
   /** 被排除条目的原因标记 */
@@ -934,7 +1294,36 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     b.classList.toggle('on', compact);
   }
 
+  /** 命中数下方一行：把当前检索条件按「包含 / 至少包含 / 排除」重述一遍，
+   *  例：包含【缠绕】、【缴械】；至少包含【沉默】；排除【锁闭】（2026-11-27 用户定） */
+  function setQCond() {
+    var el = $('qCond');
+    if (!el) return;
+    var q = (MODE === 'tag' && S.tag && S.tag.query) ? S.tag.query : null;
+    var parts = [];
+    if (q) {
+      var wrap = function (list) {
+        return list.map(function (x) { return '<b>【' + esc(x) + '】</b>'; }).join('、');
+      };
+      if (q.and && q.and.length) parts.push('<span class="kw">包含</span>' + wrap(q.and));
+      if (q.or && q.or.length) parts.push('<span class="kw">至少包含</span>' + wrap(q.or));
+      if (q.not && q.not.length) parts.push('<span class="kw">排除</span>' + wrap(q.not));
+      if (q.heroes && q.heroes.length) {
+        parts.push('<span class="kw">英雄</span><b>【' + esc(heroNames(q.heroes, 6)) + '】</b>');
+      }
+      if (q.cast) {
+        var lo = (q.cast.min == null ? '不限' : q.cast.min);
+        var hi = (q.cast.max == null ? '不限' : q.cast.max);
+        parts.push('<span class="kw">施法前摇</span><b>' + esc(lo + ' ~ ' + hi + ' 秒') + '</b>');
+      }
+    }
+    if (!parts.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.innerHTML = parts.join('；');
+    el.style.display = 'block';
+  }
+
   function renderTag(r) {
+    setQCond();
     $('nHit').textContent = r.hits.length;
     $('nScan').textContent = '（全库扫描 ' + r.scanned + ' 条）';
     $('btnCsv').disabled = r.hits.length === 0;
@@ -1041,9 +1430,13 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       // 每个技能 = 一个不可拆分的块（升级图标 + 技能名），整体随流换行
       html += '<div class="cmpgrid">';
       list.forEach(function (h, i) {
+        var srcKey0 = core.srcOf(h.ability);
         var hn = (h.heroes || []).length ? '　英雄：' + heroNames(h.heroes.map(function (x) { return x.id; }), 3)
-          : (core.srcOf(h.ability) !== 'hero'
-            ? '　来源：' + srcLabel(core.srcOf(h.ability)) : '');
+          : (srcKey0 === 'creep'
+            ? ((h.ability && h.ability.o) ? '　' + h.ability.o : '')
+            : (srcKey0 === 'item' || srcKey0 === 'itemOld'
+              ? ((h.ability && h.ability.in) ? '　' + h.ability.in : '')
+              : (srcKey0 !== 'hero' ? '　来源：' + srcLabel(srcKey0) : '')));
         html += '<div class="cmitem' + (h.excluded ? ' ex' : '') + '" title="' +
           esc((h.name || '(无名)') + '　#' + h.id + hn + '　点击查看详情') + '">' +
           '<span class="cmup">' + iconOnly(h.upgrades) + '</span>' +
@@ -1052,64 +1445,9 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       });
       html += '</div>';
     } else {
-      html += '<table class="tagTbl"><thead><tr><th style="width:156px">升级项</th><th style="width:184px">技能 / 英雄</th>' +
-        '<th style="width:62px">ID</th><th style="width:92px">施法前摇</th><th>命中详情</th><th style="width:56px">tag 数</th>' +
-        '<th style="width:52px"></th></tr></thead><tbody>';
-      list.forEach(function (h, i) {
-        var featSeen = {};
-        // 命中单元：同效果匹配时，标明这些 tag 是在同一处成立的
-        var uLabels = h.unitLabels || [];
-        // 只有两条以上「效果类」条件时才提示「同效果」——一条时位置已由上面的 chip 说明
-        var effConds = h.detail.filter(function (d) { return d.unit; }).length;
-        var unitChip = (uLabels.length && effConds >= 2)
-          ? '<span class="chip unit" title="这些效果类条件是在同一条效果里同时成立的">同效果 · ' +
-            esc(uLabels.slice(0, 3).join(' / ')) + (uLabels.length > 3 ? ' …' : '') + '</span>'
-          : '';
-        var chips = h.detail.map(function (d) {
-          var locs = d.loc.map(function (l) { return esc(l.where); }).join(' / ');
-          // 命中技能特性 → 展示特性内容（同一特性只显示一次）
-          var featHtml = '';
-          d.loc.forEach(function (l) {
-            (l.feats || []).forEach(function (f) {
-              if (!f.text || featSeen[f.id]) return;
-              featSeen[f.id] = 1;
-              featHtml += '<span class="feat"><b>' + esc(f.name) + '</b>' + esc(f.text) + '</span>';
-            });
-          });
-          // 同名多义：标出命中的是哪一个类别；未指定类别时警示「共 N 种含义」
-          var catHtml = '';
-          var g0 = (d.groups || []).filter(function (g) { return g.cat === d.cat; })[0];
-          if (d.cat) {
-            var vv = (g0 && g0.variants) || [];
-            // 名字里已经写了「（类别）」就不再重复类别名，只提示档位数
-            var named = String(d.name).indexOf('（' + d.cat + '）') >= 0 || String(d.name).indexOf('(' + d.cat + ')') >= 0;
-            var txt = (named ? '' : d.cat) + (vv.length ? (named ? '' : ' · ') + (vv.length + 1) + ' 档' : '');
-            if (txt) {
-              catHtml = '<span class="cat' + (vv.length ? ' tie' : '') + '"' +
-                (vv.length ? ' title="该类别含 ' + (vv.length + 1) + ' 档：基础 + ' +
-                  esc(vv.join('/')) + ' 变体，命中任一档即算"' : '') + '>' + esc(txt) + '</span>';
-            }
-          } else if (d.ambiguous && d.groups && d.groups.length > 1) {
-            catHtml = '<span class="cat amb" title="同名 tag 有多种含义：' +
-              esc(d.groups.map(function (g) { return g.cat + '（' + g.ids.length + ' 个 id）'; }).join('、')) +
-              '。全部含义都在匹配；要只匹配其中一种，用补全里带（类别）的写法。">共 ' + d.groups.length + ' 种含义</span>';
-          }
-          return '<span class="chip ' + d.group + '">' +
-            (d.group === 'and' ? '且' : '或') + ' · ' + esc(d.name) + catHtml +
-            (locs ? ' <span class="loc">@ ' + locs + '</span>' : '') + featHtml + '</span>';
-        }).join('');
-        html += '<tr' + (h.excluded ? ' class="ex"' : '') + '>' +
-          '<td class="upcell">' + upgradeChips(h.upgrades) + '</td>' +
-          '<td class="nm">' + esc(h.name || '(无名)') + exTag(h) + '<div class="en">' + esc(h.en) + '</div>' +
-          heroLine(h) + '</td>' +
-          '<td class="id">' + h.id + '</td>' +
-          '<td class="cpcell">' + (h.cast ? esc(h.cast) : '<span class="count">—</span>') + '</td>' +
-          '<td>' + unitChip + chips + '</td>' +
-          '<td class="count">' + h.tagCount + '</td>' +
-          '<td><button class="btn link" data-detail="' + i + '">详情</button></td>' +
-          '</tr>';
-      });
-      html += '</tbody></table>';
+      // 详细模式：与数值检索同款等宽技能卡片；不展示数值 / tag 数，未填前摇时不显示前摇段
+      var showCast = !!(r.stats && r.stats.cast && r.stats.cast.on);
+      html += tagCards(list, showCast);
     }
     if (r.hits.length > LIMIT) {
       html += '<div class="empty">已显示前 ' + LIMIT + ' 条，共 ' + r.hits.length +
@@ -1200,9 +1538,13 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     if (viewMode === 'compact') {
       html += '<div class="cmpgrid">';
       list.forEach(function (h, i) {
+        var srcKey0 = core.srcOf(h.ability);
         var hn = (h.heroes || []).length ? '　英雄：' + heroNames(h.heroes.map(function (x) { return x.id; }), 3)
-          : (core.srcOf(h.ability) !== 'hero'
-            ? '　来源：' + srcLabel(core.srcOf(h.ability)) : '');
+          : (srcKey0 === 'creep'
+            ? ((h.ability && h.ability.o) ? '　' + h.ability.o : '')
+            : (srcKey0 === 'item' || srcKey0 === 'itemOld'
+              ? ((h.ability && h.ability.in) ? '　' + h.ability.in : '')
+              : (srcKey0 !== 'hero' ? '　来源：' + srcLabel(srcKey0) : '')));
         html += '<div class="cmitem' + (h.excluded ? ' ex' : '') + '" title="' +
           esc((h.name || '(无名)') + '　#' + h.id + hn + '　命中 ' + h.matched + ' 行　点击查看详情') + '">' +
           '<span class="cmup">' + iconOnly(h.upgrades) + '</span>' +
@@ -1212,7 +1554,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       html += '</div>';
     } else {
       html += '<table class="noteTbl"><thead><tr><th style="width:140px">升级项</th><th style="width:164px">技能 / 英雄</th>' +
-        '<th style="width:56px">ID</th><th>命中行（注释原文）</th><th style="width:56px">命中</th>' +
+        '<th style="width:56px">ID</th><th>命中行（注释原文）</th>' +
         '<th style="width:56px"></th></tr></thead><tbody>';
       list.forEach(function (h, i) {
         var SHOW = 4;
@@ -1230,7 +1572,6 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
           heroLine(h) + '</td>' +
           '<td class="id">' + h.id + '</td>' +
           '<td>' + cell + '</td>' +
-          '<td class="count">' + h.matched + '/' + h.noteCount + '</td>' +
           '<td><button class="btn link" data-detail="' + i + '">详情</button></td>' +
           '</tr>';
       });
@@ -1274,6 +1615,12 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   /** 详情弹窗的「所属英雄」段 */
   function heroSec(h) {
     var key = core.srcOf(h && h.ability);
+    if (key === 'creep') {
+      var own = (h && h.ability && h.ability.o) || '';
+      return '<div class="sec"><h4>原主</h4>' +
+        (own ? '<span class="chip">' + esc(own) + '</span>'
+             : '<span class="count">（未登记）</span>') + '</div>';
+    }
     if (key !== 'hero') {
       return '<div class="sec"><h4>技能来源</h4><span class="chip">' + esc(srcMeta(key).label) +
         '</span><span class="count" style="margin-left:8px">该来源没有英雄归属</span></div>';
@@ -1310,9 +1657,12 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       body += '<div class="sec"><h4>升级项</h4>' + upgradeChips(d.upgrades) + '</div>';
     }
     body += heroSec(h);
-    body += '<div class="sec"><h4>施法前摇</h4><span class="cpcell" style="font-size:13px">' +
-      (d.cast ? esc(d.cast) + ' 秒' : '<span class="count">（无数据）</span>') + '</span>' +
-      '<span class="count" style="margin-left:8px">后台字段 ability_cast_point</span></div>';
+    var showCastDetail = !(MODE === 'tag' && (!S.tag || !S.tag.query || !core.castActive(S.tag.query.cast)));
+    if (showCastDetail) {
+      body += '<div class="sec"><h4>施法前摇</h4><span class="cpcell" style="font-size:13px">' +
+        (d.cast ? esc(d.cast) + ' 秒' : '<span class="count">（无数据）</span>') + '</span>' +
+        '<span class="count" style="margin-left:8px">后台字段 ability_cast_point</span></div>';
+    }
     if (d.detail.length) body += '<div class="sec"><h4>技能类型</h4>' + names(d.detail) + '</div>';
     if (d.mech.length) {
       body += '<div class="sec"><h4>技能特性（机制项）</h4>' +
@@ -1321,7 +1671,6 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
             (t.text ? '<div class="feattext">' + esc(t.text) + '</div>' : '') + '</div>';
         }).join('') + '</div>';
     }
-    if (d.tags.length) body += '<div class="sec"><h4>tags 字段</h4>' + names(d.tags) + '</div>';
     d.effects.forEach(function (e, i) {
       if (!e.tags.length) return;
       body += '<div class="sec"><h4>技能效果 ' + (i + 1) + (e.name ? '「' + esc(e.name) + '」' : '') + '</h4>' + names(e.tags) + '</div>';
@@ -1331,7 +1680,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     $('mBody').innerHTML = body || '<div class="empty">该技能在所选范围内没有任何 tag</div>';
     $('mask').classList.add('on');
   }
-  // 「名称（类别）」可直接点击填入输入框（多义提示 / 同名一览弹窗里都是）
+  // 「名称（类别）」可直接点击填入输入框（多义提示里用）
   document.addEventListener('click', function (e) {
     if (!e.target || !e.target.closest) return;
     var b = e.target.closest('.resol code[data-fill]');
@@ -1355,7 +1704,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   $('mClose').addEventListener('click', function () { $('mask').classList.remove('on'); });
   $('mask').addEventListener('click', function (e) { if (e.target === $('mask')) $('mask').classList.remove('on'); });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { $('mask').classList.remove('on'); $('updMask').classList.remove('on'); }
+    if (e.key === 'Escape') { $('mask').classList.remove('on'); $('updMask').classList.remove('on'); $('icoMask').classList.remove('on'); }
   });
 
   // ---------- 模式切换 / 结果重绘 ----------
@@ -1371,6 +1720,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     $('nHit').textContent = '0';
     $('nScan').textContent = '';
     $('btnCsv').disabled = true;
+    setQCond();
     if (NODATA) {
       $('tblbox').innerHTML = '<div class="empty">'
         + '<div style="font-size:15px;color:var(--text);margin-bottom:10px">还没有数据 —— 先抓一份</div>'
@@ -1386,16 +1736,23 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     }
     $('tblbox').innerHTML = MODE === 'tag'
       ? '<div class="empty">在左侧输入 tag 名称后点击「检索」</div>'
-      : '<div class="empty">在左侧输入要查找的注释内容后点击「检索」</div>';
+      : (MODE === 'bonus'
+        ? '<div class="empty">在左侧选择一个加成属性 tag 即可检索</div>'
+        : (MODE === 'value'
+          ? '<div class="empty">在左侧输入 tag 名称（如「伤害」）后点击「检索」</div>'
+          : '<div class="empty">在左侧输入要查找的注释内容后点击「检索」</div>'));
     updateViewBtn();
   }
 
   /** 就地重绘当前模式的结果（切换简/详、切换模式时用，不重新检索） */
   function redraw() {
     if (!readSources().length) { showSrcBlock(); return; }
-    var st = MODE === 'tag' ? S.tag : S.note;
+    var st = MODE === 'tag' ? S.tag : (MODE === 'bonus' ? S.bonus : (MODE === 'value' ? S.value : S.note));
     if (!st) { showEmpty(); return; }
-    if (MODE === 'tag') renderTag(st.result); else renderNote(st.result);
+    if (MODE === 'tag') renderTag(st.result);
+    else if (MODE === 'bonus') renderBonus(st.result);
+    else if (MODE === 'value') renderValue(st.result);
+    else renderNote(st.result);
   }
 
   /** 注释数据缺失提示（旧快照没有 notePool） */
@@ -1406,10 +1763,298 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       : '<div class="warnbox">当前 data.js 不含注释内容（旧快照）—— 请点右上角「⟳ 更新本地数据」重新抓取一次。</div>';
   }
 
+  /** 文本显示宽度：中日韩全角字符按 2 计，其余按 1 计 */
+  function textWidth(s) {
+    var t = String(s == null ? '' : s), n = 0;
+    for (var i = 0; i < t.length; i++) n += /[\u2E80-\uFEFF]/.test(t.charAt(i)) ? 2 : 1;
+    return n;
+  }
+
+  /** 卡片网格的最小列宽（px）：由结果里最长的数据项决定，避免出现细长挤压的卡片。
+   *  实际每行个数仍由容器宽度（显示器分辨率）通过 CSS auto-fill 自动决定。 */
+  function gridCardMin(hits, withValue) {
+    var maxW = 12;
+    hits.slice(0, 120).forEach(function (h) {
+      maxW = Math.max(maxW, textWidth(h.name));
+      if (h.items && h.items.length) {
+        h.items.forEach(function (it) {
+          var w = textWidth(it.name) + (withValue ? textWidth(it.value) + 3 : 0);
+          maxW = Math.max(maxW, w);
+        });
+      } else {
+        // Tag 详细卡片：按命中的效果位置估宽（特性描述可换行，不参与估宽）
+        (h.detail || []).forEach(function (d) {
+          (d.loc || []).forEach(function (l) { maxW = Math.max(maxW, textWidth(l.where) + 4); });
+        });
+      }
+    });
+    // 预留 88px 图片位 + 文字最小可读宽度 → 230px 保底；超长条目封顶 460px，避免大屏上卡片过宽
+    return Math.round(Math.min(460, Math.max(230, 90 + maxW * 7)));
+  }
+
+  /** imgMap 取值：物品技能与英雄技能是同名不同空间的编号（同 id 可能是两个技能），
+   *  物品技能在 imgMap 里存成 'item:<id>'，避免与英雄技能互相覆盖。 */
+  function imgEntry(h) {
+    var id = (h && h.id != null) ? String(h.id) : '';
+    var a = h && h.ability;
+    var key = (a && a.src === 'item') ? 'item:' + id : id;
+    return IMGMAP[key] || {};
+  }
+  /** 卡片图片接口：默认读 data.js 的 imgMap（本地下载好的图标相对路径）。
+   *  也可由 window.__tagsearch.setCardImageResolver(fn) 注入外部解析逻辑；
+   *  取不到时渲染占位块，位置/尺寸与正式图片完全一致。 */
+  var cardImageResolver = function (h) {
+    if (!h) return '';
+    return imgEntry(h).s || '';
+  };
+  var defaultCardImageResolver = cardImageResolver;   // 传 null 时恢复到默认（读 imgMap）
+  function cardImageSrc(h) {
+    try { return String(cardImageResolver(h) || ''); } catch (e) { return ''; }
+  }
+  /** 卡片头部小图标：英雄取单位头像（imgMap.u），缺失时给占位块；
+   *  物品技能（含非现版本）完全不渲染图标，也不留占位空格。 */
+  function headerIcon(h) {
+    var key = core.srcOf(h && h.ability);
+    if (key === 'item' || key === 'itemOld') return '';
+    var m = imgEntry(h);
+    if (m.u) return '<img class="schico" src="' + esc(m.u) + '" alt="">';
+    return '<span class="schico phico"></span>';
+  }
+
+  /** 数据项中文名渲染：
+   *  · 升级占位符 {%1051%} 就地换成升级项 chip（不再是全部条目上方的独立区块）
+   *  · 加成检索里**所有**加成替换符都去掉（不只是被检索的那个）：如「弹射距离百分比
+   *    {%1047%}{%1156%}{%1161%}」选中 1156 时，1156/1161 均不展示、1047 就地换成魔晶 chip */
+  function itemNameHtml(name, kind, stripId) {
+    var s = String(name == null ? '' : name), out = '', last = 0, m;
+    var re = /\{%(\d+)%\}/g;
+    while ((m = re.exec(s)) !== null) {
+      out += esc(s.slice(last, m.index));
+      var id = parseInt(m[1], 10);
+      if (kind === 'bonus' && id === stripId) {
+        // 被检索的加成替换符不展示
+      } else if (kind === 'bonus' && !core.UPGRADE_META[id]) {
+        // 同一项里挂的其他加成替换符也不展示（如 {%1161%}）
+      } else if (core.UPGRADE_META[id]) {
+        var up = core.UPGRADE_META[id];
+        var ico = up.img
+          ? '<img class="ico" src="' + esc(up.img) + '" alt="' + esc(up.label) + '" loading="lazy"' +
+            (up.cdn ? ' onerror="this.onerror=null;this.src=\'' + esc(up.cdn) + '\'"' : '') + '>'
+          : '<span class="ico" style="background:' + (up.color || '#9aa4b2') + '"></span>';
+        out += '<span class="up upinline ' + up.cls + '" title="' + esc(up.full + ' · ' + up.ph) + '">' +
+          ico + '<span class="lb">' + esc(up.label) + '</span></span>';
+      } else {
+        out += esc(m[0]);
+      }
+      last = m.index + m[0].length;
+    }
+    return out + esc(s.slice(last));
+  }
+
+  /** 加成 / 数值共用：等宽技能卡片网格（kind='bonus' 或 'value'） */
+  function skillCards(hits, kind, stripId) {
+    var withValue = kind === 'bonus' || kind === 'value';
+    var html = '<div class="skillgrid" style="--card-min:' + gridCardMin(hits, withValue) + 'px">';
+    hits.forEach(function (h) {
+      var src = cardImageSrc(h);
+      var pic = src
+        ? '<img class="scpic" src="' + esc(src) + '" alt="" loading="lazy">'
+        : '<div class="scpic ph">图片</div>';
+      html += '<div class="skillcard' + (h.excluded ? ' ex' : '') + '">' +
+        '<div class="schd">' + headerIcon(h) +
+        '<div class="scnm">' + esc(h.name || '(无名)') + exTag(h) + '</div>' +
+        '<div class="scid">#' + h.id + '</div></div>' +
+        '<div class="scbody">' + pic + '<div class="scinfo">' +
+        (h.en ? '<div class="scen">' + esc(h.en) + '</div>' : '') +
+        heroLine(h) +
+        '<div class="scitems">' + h.items.map(function (it) {
+          var s = '<div class="scit"><span class="nmv">' +
+            itemNameHtml(it.name, kind, stripId) + '</span>';
+          if (withValue) s += '<span class="vv">: ' + esc(it.value || '—') + '</span>';
+          if (it.hand) s += '<span class="bc">（手填）</span>';
+          return s + '</div>';
+        }).join('') + '</div></div></div></div>';
+    });
+    return html + '</div>';
+  }
+
+  /** Tag 结果命中位置：不再重复 tag 名称，只显示「效果5「潮汐使者护甲穿透」」这类位置；
+   *  命中技能特性时把特性描述附在「技能特性」chip 内。 */
+  function tagLocChips(h) {
+    var map = {}, order = [], seenFeat = {};
+    (h.detail || []).forEach(function (d) {
+      (d.loc || []).forEach(function (l) {
+        var key = l.where || '';
+        if (!map[key]) { map[key] = []; order.push(key); }
+        (l.feats || []).forEach(function (f) {
+          if (!f.text || seenFeat[f.id]) return;
+          seenFeat[f.id] = 1;
+          map[key].push(f);
+        });
+      });
+    });
+    return order.map(function (key) {
+      var feats = map[key].map(function (f) {
+        return '<span class="feat"><b>' + esc(f.name) + '</b>' + esc(f.text) + '</span>';
+      }).join('');
+      return '<span class="chip">' + esc(key) + feats + '</span>';
+    }).join('');
+  }
+
+  /** Tag 结果只展示真正造成「前后效果 tag 差异」的升级项：
+   *  · 同一个效果名有基础/升级两版，且该 tag 只在其中一版出现 → 展示那一版携带的升级项；
+   *  · 两版都含该 tag，或该效果只有一个版本（如潮汐使者护甲穿透） → 视为一致，不展示升级项。 */
+  function tagUpgrades(h) {
+    var effs = (h.ability && h.ability.e) || [];
+    var got = {};
+    (h.detail || []).forEach(function (d) {
+      (d.loc || []).forEach(function (l) {
+        if (l.kind !== 'e' || !l.row) return;
+        var row = effs[l.row - 1];
+        if (!row) return;
+        var name = String(row.n || '');
+        if (!name) return;
+        var peers = effs.filter(function (r) { return String(r.n || '') === name; });
+        if (peers.length < 2) return;
+        (d.ids || []).forEach(function (id) {
+          var withId = peers.filter(function (r) { return (r.t || []).indexOf(id) >= 0; });
+          var without = peers.filter(function (r) { return (r.t || []).indexOf(id) < 0; });
+          if (!withId.length || !without.length) return;
+          withId.forEach(function (r) {
+            (r.t || []).forEach(function (x) {
+              if (core.UPGRADE_META[x]) got[x] = 1;
+            });
+          });
+        });
+      });
+    });
+    return core.UPGRADE_ORDER.filter(function (x) { return got[x]; });
+  }
+
+  /** Tag 检索详细展示：与数值检索相同的等宽技能卡片，只是没有数值；
+   *  只显示命中位置与技能特性描述，底部保留「详情」按钮，不显示 tag 数。 */
+  function tagCards(hits, showCast) {
+    var html = '<div class="skillgrid taggrid" style="--card-min:' + gridCardMin(hits, false) + 'px">';
+    hits.forEach(function (h, i) {
+      var src = cardImageSrc(h);
+      var pic = src
+        ? '<img class="scpic" src="' + esc(src) + '" alt="" loading="lazy">'
+        : '<div class="scpic ph">图片</div>';
+      var chips = tagLocChips(h);
+      var ups = tagUpgrades(h);
+      html += '<div class="skillcard' + (h.excluded ? ' ex' : '') + '">' +
+        '<div class="schd">' + headerIcon(h) +
+        '<div class="scnm">' + esc(h.name || '(无名)') + exTag(h) + '</div>' +
+        '<div class="scid">#' + h.id + '</div></div>' +
+        '<div class="scbody">' + pic + '<div class="scinfo">' +
+        (h.en ? '<div class="scen">' + esc(h.en) + '</div>' : '') +
+        heroLine(h) +
+        (showCast ? '<div class="tagcast">施法前摇<span class="cpcell">' +
+          (h.cast ? esc(h.cast) + ' 秒' : '<span class="count">—</span>') + '</span></div>' : '') +
+        /* 升级项不再单独占一行、也不写「升级项」字样：升级项 chip 与命中位置 chip 排在同一行 */
+        '<div class="scitems tagitems">' +
+          (ups.length ? upgradeChips(ups, true) : '') + chips + '</div>' +
+        '<button type="button" class="btn link scdetail" data-detail="' + i + '">详情</button>' +
+        '</div></div></div>';
+    });
+    return html + '</div>';
+  }
+
+  /** 加成检索结果：按技能分组列出命中的「自定义中文名 = 数值」数据项 */
+  function renderBonus(r) {
+    $('nHit').textContent = r.hits.length;
+    $('nScan').textContent = '（全库扫描 ' + r.scanned + ' 条技能）';
+    $('btnCsv').disabled = r.hits.length === 0;
+    updateViewBtn();
+
+    var nm = (r.stats.tag && r.stats.tag.name) || ('加成属性 ' + r.tag);
+    var nItems = r.hits.reduce(function (s, h) { return s + h.count; }, 0);
+    var html = '<div class="infobox" style="margin:12px 14px 0">按替换符 <b>{%' + r.tag + '%}</b>（' +
+      esc(nm) + '）匹配数据项名称：命中 <b>' + r.hits.length + '</b> 个技能 / <b>' + nItems +
+      '</b> 个数据项；仅统计名称处于<b>开启</b>状态的数据项。</div>';
+    if (r.stats) {
+      var sb = r.stats.excludedBy || {};
+      var parts = core.EXCLUDE_KINDS.filter(function (k) { return sb[k.key]; })
+        .map(function (k) { return k.label + ' <b>' + sb[k.key] + '</b>'; });
+      var detail = parts.length ? '（' + parts.join(' / ') + '）' : '';
+      if (r.stats.includeExcluded) {
+        if (r.stats.poolExcluded) html += '<div class="infobox" style="margin:12px 14px 0">已<b>包含</b>被排除项' +
+          detail + '，共 <b>' + r.stats.poolExcluded + '</b> 条。</div>';
+      } else if (r.stats.poolExcluded) {
+        html += '<div class="infobox" style="margin:12px 14px 0">已默认排除 <b>' + r.stats.poolExcluded +
+          '</b> 条非技能条目' + detail + '，检索基于其余 <b>' + r.stats.effective + '</b> 条。</div>';
+      }
+    }
+    if (r.stats && r.stats.src && r.stats.src.on) {
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>技能来源</b>筛选：' +
+        esc(r.stats.src.keys.map(srcLabel).join('、')) +
+        '，另排除其他来源的技能 <b>' + r.stats.src.out + '</b> 条。</div>';
+    }
+    if (r.stats && r.stats.hero && r.stats.hero.on) {
+      var hh = r.stats.hero;
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>英雄</b>筛选：' + esc(heroNames(hh.ids)) +
+        (hh.out ? '，另排除未登记给所选英雄的 <b>' + hh.out + '</b> 条' : '') + '。</div>';
+    }
+    if (!r.hits.length) {
+      $('tblbox').innerHTML = html + '<div class="empty">没有技能的数据项名称含该替换符</div>';
+      return;
+    }
+    var LIMIT = viewMode === 'compact' ? 1500 : 400;
+    $('tblbox').innerHTML = html + skillCards(r.hits.slice(0, LIMIT), 'bonus', r.tag);
+  }
+
+  /** 数值检索结果：按技能分组列出命中的「自定义中文名 = 数值」数据项 */
+  function renderValue(r) {
+    $('nHit').textContent = r.hits.length;
+    $('nScan').textContent = '（全库扫描 ' + r.scanned + ' 条技能）';
+    $('btnCsv').disabled = r.hits.length === 0;
+    updateViewBtn();
+
+    var tn = (r.tagNames && r.tagNames.length) ? r.tagNames.join('、') : (r.tags || []).join(', ');
+    var nItems = r.hits.reduce(function (s, h) { return s + h.count; }, 0);
+    var html = '<div class="infobox" style="margin:12px 14px 0">按 tag <b>' + esc(tn) +
+      '</b> 匹配数据项的<b>关联 tag / 名称替换符</b>：命中 <b>' + r.hits.length + '</b> 个技能 / <b>' +
+      nItems + '</b> 个数据项。数值口径：常规值 = 前缀 + 数值 + 后缀；手填值原样显示。</div>';
+    if (r.stats) {
+      var sb = r.stats.excludedBy || {};
+      var parts = core.EXCLUDE_KINDS.filter(function (k) { return sb[k.key]; })
+        .map(function (k) { return k.label + ' <b>' + sb[k.key] + '</b>'; });
+      var detail = parts.length ? '（' + parts.join(' / ') + '）' : '';
+      if (r.stats.includeExcluded) {
+        if (r.stats.poolExcluded) html += '<div class="infobox" style="margin:12px 14px 0">已<b>包含</b>被排除项' +
+          detail + '，共 <b>' + r.stats.poolExcluded + '</b> 条。</div>';
+      } else if (r.stats.poolExcluded) {
+        html += '<div class="infobox" style="margin:12px 14px 0">已默认排除 <b>' + r.stats.poolExcluded +
+          '</b> 条非技能条目' + detail + '，检索基于其余 <b>' + r.stats.effective + '</b> 条。</div>';
+      }
+    }
+    if (r.stats && r.stats.src && r.stats.src.on) {
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>技能来源</b>筛选：' +
+        esc(r.stats.src.keys.map(srcLabel).join('、')) +
+        '，另排除其他来源的技能 <b>' + r.stats.src.out + '</b> 条。</div>';
+    }
+    if (r.stats && r.stats.hero && r.stats.hero.on) {
+      var hh = r.stats.hero;
+      html += '<div class="infobox" style="margin:12px 14px 0">已按<b>英雄</b>筛选：' + esc(heroNames(hh.ids)) +
+        (hh.out ? '，另排除未登记给所选英雄的 <b>' + hh.out + '</b> 条' : '') + '。</div>';
+    }
+    if (!r.hits.length) {
+      $('tblbox').innerHTML = html + '<div class="empty">没有数据项关联所选 tag</div>';
+      return;
+    }
+    var LIMIT = viewMode === 'compact' ? 1500 : 400;
+    $('tblbox').innerHTML = html + skillCards(r.hits.slice(0, LIMIT), 'value');
+  }
+
   function setMode(m) {
-    MODE = m === 'note' ? 'note' : 'tag';
+    MODE = (m === 'note' || m === 'bonus' || m === 'value') ? m : 'tag';
+    // 简/详切换只在 Tag 检索有意义：其余模式强制详细并隐藏按钮
+    if ($('btnView')) $('btnView').style.display = MODE === 'tag' ? '' : 'none';
+    if (MODE !== 'tag' && viewMode !== 'full') { viewMode = 'full'; updateViewBtn(); }
     $('paneTag').style.display = MODE === 'tag' ? '' : 'none';
     $('paneNote').style.display = MODE === 'note' ? '' : 'none';
+    $('paneBonus').style.display = MODE === 'bonus' ? '' : 'none';
+    $('paneValue').style.display = MODE === 'value' ? '' : 'none';
     Array.prototype.slice.call($('modes').querySelectorAll('.mbtn')).forEach(function (b) {
       b.classList.toggle('on', b.getAttribute('data-mode') === MODE);
     });
@@ -1493,14 +2138,46 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     downloadCsv(rows, 'tagsearch-note');
   }
 
+  function csvBonus() {
+    var q = S.bonus.query, r = S.bonus.result;
+    var nm = (r.stats.tag && r.stats.tag.name) || ('加成属性 ' + q.tag);
+    var rows = [['加成属性', 'tag id', '替换符', '升级项', '技能名', '技能ID', '英文名', '英雄',
+      '命中的数据项名称', '数值', '前缀', '后缀', '手填', '命中项数', '排除原因']];
+    r.hits.forEach(function (h) {
+      rows.push([nm, q.tag, '{%' + q.tag + '%}', upNames(h.upgrades), h.name, h.id, h.en, heroCsv(h),
+        h.items.map(function (it) { return it.name; }).join(' | '),
+        h.items.map(function (it) { return it.value; }).join(' | '),
+        h.items.map(function (it) { return it.prefix; }).join(' | '),
+        h.items.map(function (it) { return it.suffix; }).join(' | '),
+        h.items.map(function (it) { return it.hand ? '是' : ''; }).join(' | '),
+        h.count, h.excluded ? (EXLABEL[h.excluded] || h.excluded) : '']);
+    });
+    downloadCsv(rows, 'tagsearch-bonus');
+  }
+
+  function csvValue() {
+    var r = S.value.result;
+    var tn = (r.tagNames && r.tagNames.length) ? r.tagNames.join('、') : (r.tags || []).join(', ');
+    var rows = [['检索tag', '升级项', '技能名', '技能ID', '英文名', '英雄', '自定义中文名', '数值', '前缀', '后缀', '手填', '命中tag', '排除原因']];
+    r.hits.forEach(function (h) {
+      h.items.forEach(function (it) {
+        rows.push([tn, upNames(h.upgrades), h.name, h.id, h.en, heroCsv(h),
+          it.name, it.value, it.prefix, it.suffix, it.hand ? '是' : '',
+          (it.matchedNames || []).join(' | '), h.excluded ? (EXLABEL[h.excluded] || h.excluded) : '']);
+      });
+    });
+    downloadCsv(rows, 'tagsearch-value');
+  }
+
   $('btnCsv').addEventListener('click', function () {
     if (MODE === 'tag') { if (S.tag) csvTag(); }
+    else if (MODE === 'bonus') { if (S.bonus) csvBonus(); }
+    else if (MODE === 'value') { if (S.value) csvValue(); }
     else if (S.note) csvNote();
   });
 
   // ---------- 更新本地数据 ----------
-  var SVC_KEY = 'tagsearch.svc';
-  var UPD = { busy: false, mem: {} };
+  var UPD = { mem: {} };
 
   function lsGet(k) {
     try { var v = localStorage.getItem(k); return v == null ? (UPD.mem[k] || '') : v; }
@@ -1511,58 +2188,10 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     try { localStorage.setItem(k, v); } catch (e) { /* 忽略 */ }
   }
 
+  /** 页头只留「数据快照」时间（2026-11-27 用户定：tag/技能/英雄/注释/同名 五项统计不再显示） */
   function setMeta() {
     $('mTime').textContent = DB.fetchedAt ? new Date(DB.fetchedAt).toLocaleString('zh-CN') : '未知';
-    $('mTags').textContent = idx.db.tags.length;
-    $('mAbs').textContent = idx.excludedTotal
-      ? (idx.abilities.length - idx.excludedTotal) + '（有效，共 ' + idx.abilities.length + '）'
-      : idx.abilities.length;
-    var ns = core.noteStats(idx);
-    $('mNotes').textContent = ns.skills ? (ns.pool + ' 行 / ' + ns.skills + ' 技能') : '无';
-    $('mHero').textContent = (idx.heroes && idx.heroes.length)
-      ? (heroList().length + '（有技能，名册 ' + idx.heroes.length + '）')
-      : '无';
-    var dupN = 0;
-    idx.names.forEach(function (n) { if ((idx.name2ids.get(n) || []).length > 1) dupN++; });
-    $('mDup').textContent = dupN ? (dupN + ' 组（多义 ' + idx.ambiguous.size + '）') : '无';
   }
-  /** 同名 tag 一览（meta 行的「同名 N」点开） */
-  function openDup() {
-    if (!idx || !idx.name2groups) return;
-    /* 同名 = 一个名字对应多个 id（含同类别多档位）；跨类别（gs.length > 1）才是真歧义 */
-    var groups = [];
-    idx.names.forEach(function (n) {
-      var ids = idx.name2ids.get(n) || [];
-      if (ids.length > 1) groups.push({ n: n, gs: idx.name2groups.get(n) || [], ids: ids });
-    });
-    groups.sort(function (a, b) {
-      return ((b.gs.length > 1 ? 1 : 0) - (a.gs.length > 1 ? 1 : 0)) ||
-        (b.ids.length - a.ids.length) || String(a.n).localeCompare(String(b.n), 'zh-Hans-CN');
-    });
-    var ambN = groups.filter(function (g) { return g.gs.length > 1; }).length;
-    var html = '<div class="sec"><h4>同名 tag 一览</h4><div class="count">' +
-      '共 <b>' + groups.length + '</b> 个名字对应多个 tag。' +
-      '<span style="color:#b3261e">红色</span> = 跨类别同名（<b>' + ambN + '</b> 个，含义不同，建议写「名称（类别）」）；' +
-      '灰色 = 同一类别的多个档位（基础 + 升级变体，命中任一档即算）。点击任意含义即填入「且」的第一行。</div></div>' +
-      '<table class="dupTbl"><thead><tr><th style="width:150px">名称</th><th>含义（类别 · id 数 · 升级变体）</th></tr></thead><tbody>';
-    groups.forEach(function (g) {
-      var amb = g.gs.length > 1;
-      html += '<tr><td class="nm">' + esc(g.n) +
-        (amb ? ' <span class="cat amb">多义</span>' : '') + '</td><td>' +
-        g.gs.map(function (x) {
-          return '<span class="duptag' + (amb ? ' amb' : '') + '" data-fill="' + esc(g.n + '（' + x.cat + '）') + '"' +
-            ' title="' + esc(g.n + '（' + x.cat + '） · ' + x.ids.length + ' 个 id：' + x.ids.join(',') + '') + '">' +
-            esc(x.cat) + ' <span class="loc">' + x.ids.length + ' id' +
-            (x.variants.length ? ' · +' + esc(x.variants.map(function (v) { return v.v || v; }).join('/')) : '') +
-            '</span></span>';
-        }).join(' ') + '</td></tr>';
-    });
-    html += '</tbody></table>';
-    $('mTitle').innerHTML = '同名 tag：' + groups.length + ' 组（跨类别多义 ' + ambN + '）';
-    $('mBody').innerHTML = html;
-    $('mask').classList.add('on');
-  }
-  $('mDup').addEventListener('click', openDup);
 
   function fillTagOptions() {
     /* 补全项：普通 tag 用原名；同名多义的展开成「名称（类别）」多条，避免选到另一个含义 */
@@ -1587,17 +2216,15 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     box.scrollTop = box.scrollHeight;
   }
 
-  function svcBase() {
-    return ($('updSvc').value || '').trim().replace(/\/+$/, '');
-  }
-
   /** 载入一份新的 TAGDB：就地重建索引，界面立即生效 */
   function applyDb(db, src) {
     if (!db || !db.tags || !db.abilities) { ulog('数据格式不正确，已忽略', 'er'); return false; }
     NODATA = false;
     var hadTag = !!(S.tag && S.tag.query), hadNote = !!(S.note && S.note.query);
-    window.TAGDB = db; DB = db; idx = core.createIndex(db);
-    S.tag = null; S.note = null;
+    var hadBonus = !!(S.bonus && S.bonus.query), hadValue = !!(S.value && S.value.query);
+    window.TAGDB = db; DB = db; IMGMAP = db.imgMap || {}; idx = core.createIndex(db);
+    rebuildValueTagCounts();
+    S.tag = null; S.note = null; S.bonus = null; S.value = null;
     // 新数据可能没有某些英雄 → 剔除失效勾选，再重绘名册
     var alive = new Set((idx.heroes || []).map(function (h) { return h.i; }));
     Array.from(heroSel).forEach(function (id) { if (!alive.has(id)) heroSel.delete(id); });
@@ -1607,11 +2234,13 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     Array.from(srcSel).forEach(function (k) { if (srcAlive.indexOf(k) < 0) srcSel.delete(k); });
     if (!srcSel.size) srcAlive.forEach(function (k) { srcSel.add(k); });
     setMeta(); fillTagOptions(); revalidateAll(true);
-    renderSrcList(); updateExpr();
+    renderSrcList(); renderBonusTags(); updateExpr();
     ulog('已载入数据：Tag ' + db.tags.length + ' 条 / 技能 ' + db.abilities.length +
       ' 条（' + (src || '未知来源') + '）', 'ok');
     if (MODE === 'tag' && hadTag) { ulog('按当前条件重新检索…', 'dim'); runTag(); }
     else if (MODE === 'note' && hadNote) { ulog('按当前条件重新检索…', 'dim'); runNote(); }
+    else if (MODE === 'bonus' && hadBonus) { ulog('按当前条件重新检索…', 'dim'); runBonus(); }
+    else if (MODE === 'value' && hadValue) { ulog('按当前条件重新检索…', 'dim'); runValue(); }
     else showEmpty();
     return true;
   }
@@ -1643,88 +2272,6 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       ulog('浏览器未完成下载（' + ((e && e.message) || e) + '）—— 服务已把 data.js 写入 tagsearch 目录，可直接使用', 'er');
       return false;
     }
-  }
-
-  function pingOne(base, ms) {
-    if (typeof fetch !== 'function') return Promise.reject(new Error('当前环境不支持 fetch'));
-    try {
-      var ctrl = window.AbortController ? new AbortController() : null;
-      var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, ms || 1800);
-      var opt = { method: 'GET' };
-      if (ctrl) opt.signal = ctrl.signal;
-      return fetch(base + '/api/ping', opt).then(function (r) {
-        clearTimeout(timer);
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      }, function (e) { clearTimeout(timer); throw e; });
-    } catch (e) {
-      return Promise.reject(e);
-    }
-  }
-
-  /** 候选服务地址：输入框 → 上次成功 → 本页同源 → 本机默认端口 */
-  function svcCandidates() {
-    var list = [svcBase(), lsGet(SVC_KEY),
-      /^https?:/.test(location.protocol) ? location.origin : '', 'http://127.0.0.1:8899'];
-    var out = [];
-    list.forEach(function (x) {
-      x = String(x || '').replace(/\/+$/, '');
-      if (x && out.indexOf(x) < 0) out.push(x);
-    });
-    return out;
-  }
-
-  function pingSvc(ms) {
-    var list = svcCandidates();
-    return (function next(i) {
-      if (i >= list.length) return Promise.reject(new Error('未找到本机更新服务（试过：' + list.join('、') + '）'));
-      return pingOne(list[i], ms).then(function (j) {
-        $('updSvc').value = list[i]; lsSet(SVC_KEY, list[i]);
-        return j;
-      }, function () { return next(i + 1); });
-    })(0);
-  }
-
-  function showSvcState(j) {
-    var b = (j.bsk && j.bsk.ok);
-    $('updSt').innerHTML = j ? ('<span class="g">服务在线</span> · bsk ' +
-      (b ? '已连接' : '<span class="r">不可用</span>'))
-      : '<span class="r">未检测到服务</span>';
-    if (j && j.bsk && !j.bsk.ok) ulog('！' + j.bsk.why, 'er');
-  }
-
-  function doUpdate() {
-    if (UPD.busy) return;
-    UPD.busy = true; $('updRun').disabled = true; $('updTip').textContent = '进行中…';
-    ulog('—— 开始更新（服务地址 ' + svcBase() + '）——', 'dim');
-    pingSvc(1800).then(function (j) {
-      showSvcState(j);
-      if (!j || !j.ok) throw new Error('本机服务响应异常');
-      if (j.bsk && !j.bsk.ok) throw new Error(j.bsk.why || 'bsk 环境不可用');
-      ulog('正在抓取：bsk 会在浏览器中导航到 partner 技能页并调用官方接口，请稍候（约 10–60 秒）…', 'dim');
-      return fetch(svcBase() + '/api/refresh', { method: 'POST' }).then(function (r) { return r.json(); });
-    }).then(function (res) {
-      if (!res) return null;
-      (res.log || []).forEach(function (l) {
-        var c = /^✓/.test(l) ? 'ok' : (/^✗|^！/.test(l) ? 'er' : (/^提示/.test(l) ? 'er' : ''));
-        ulog(l, c);
-      });
-      if (!res.ok) throw new Error(res.error || '抓取失败');
-      ulog('服务已将新快照写入 ' + 'tagsearch/data.js' + (res.sizeKB ? '（' + res.sizeKB + ' KB）' : ''), 'ok');
-      return reloadDataJs().then(function (db) {
-        applyDb(db, '站点最新数据');
-        downloadDataJs(db);
-      });
-    }).catch(function (e) {
-      var msg = (e && e.message) || String(e);
-      ulog('✗ ' + msg, 'er');
-      if (/Failed to fetch|NetworkError|abort|无法加载|未找到本机更新服务/i.test(msg)) {
-        ulog('→ 未检测到本机更新服务。请双击 start.bat 启动（或改用下面人工方式 ② / ③）。', 'er');
-        $('updSt').innerHTML = '<span class="r">未检测到服务</span>';
-      }
-    }).then(function () {
-      UPD.busy = false; $('updRun').disabled = false; $('updTip').textContent = '';
-    });
   }
 
   // ---------- _raw.json → 内部数据（等价于 build_data.py：特性/注释池化 + 英雄归属） ----------
@@ -1824,7 +2371,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
      * items = 物品技能（写 src:'item'）。物品技能 id 与英雄技能不是同一编号空间，不查 ability_map。
      * itemRefs = 现版本物品技能 id（道具数据 item/list 里 **cate1 非空且非已移除/未发布** 道具的 ability_map）→ 写 cur:1。
      * creepRefs = 非英雄单位技能代码名（本地《编写规范/非英雄单位技能.md》，构建时注入 _raw.json）→ 写 src:'creep'。 */
-    var out = [], itemRefs = {}, itemCur = false, creepRefs = {};
+    var out = [], itemRefs = {}, itemCur = false, creepRefs = {}, creepOwners = d.creepOwners || {};
     (d.itemRefs || []).forEach(function (x) { var k = parseInt(x, 10); if (k > 0) itemRefs[k] = 1; });
     itemCur = Object.keys(itemRefs).length > 0;
     (d.creepRefs || []).forEach(function (x) { var k = String(x == null ? '' : x); if (k) creepRefs[k] = 1; });
@@ -1832,12 +2379,34 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
       for (var n = 0; n < list.length; n++) {
         var a = list[n] || {};
         var b = { i: a.i, n: a.n, en: a.en, d: a.d || [], g: a.g || [], m: a.m || [], e: a.e || [] };
+        // 加成属性数据项（书签/接口抓到的 bx：[中文名, [tag id…]]），旧 raw 无此字段时留空
+        var rawBx = a.bx || [], bx = [];
+        for (var bxn = 0; bxn < rawBx.length; bxn++) {
+          var bi = rawBx[bxn];
+          if (!bi || !Array.isArray(bi[1])) continue;
+          var bnm = String(bi[0] == null ? '' : bi[0]), bids = [];
+          for (var bxj = 0; bxj < bi[1].length; bxj++) {
+            var btid = parseInt(bi[1][bxj], 10);
+            if (btid > 0 && bids.indexOf(btid) < 0) bids.push(btid);
+          }
+          if (bnm && bids.length) bx.push([bnm, bids]);
+        }
+        if (bx.length) b.bx = bx;
+        // 数值数据项（2026-11-27）：vx 已是紧凑数组 [名称, 数值, 前缀, 后缀, 手填, [关联tag], [替换符tag]]，直接透传
+        var rawVx = a.vx || [], vx = [];
+        for (var vxn = 0; vxn < rawVx.length; vxn++) {
+          var vi = rawVx[vxn];
+          if (Array.isArray(vi) && vi.length >= 2 && String(vi[0] == null ? '' : vi[0]).trim()) vx.push(vi);
+        }
+        if (vx.length) b.vx = vx;
         if (isFreshUt(a.ut)) b.nx = 1;
         /* 来源：显式传入（物品技能）优先；否则命中非英雄单位技能表 → creep，其余缺省 hero */
         var key = srcKey || (creepRefs[a.en] ? 'creep' : null);
         var hs = key ? null : skillHero[a.i];
         if (hs && hs.length) b.h = hs;
         if (key) b.src = key;
+        /* 原主（非英雄单位技能）：creepOwners = 代码名 → 原主中文名（《编写规范/非英雄单位技能.md》原主列） */
+        if (key === 'creep' && creepOwners[a.en]) b.o = creepOwners[a.en];
         if (key && itemCur && itemRefs[a.i]) b.cur = 1;
 
         var rawF = a.f || [], fidx = [];
@@ -1921,24 +2490,93 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     });
   })();
 
+  /** 轻提示 */
+  var toastT = 0;
+  function toast(msg) {
+    var el = $('toast');
+    el.textContent = msg;
+    el.classList.add('on');
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { el.classList.remove('on'); }, 2200);
+  }
+  function copyText(txt, tipEl, okMsg) {
+    function ok() { if (tipEl) { tipEl.textContent = okMsg || '已复制'; setTimeout(function () { tipEl.textContent = ''; }, 2000); } }
+    function fb() {
+      var t = document.createElement('textarea');
+      t.value = txt; t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); } catch (e) { /* 忽略 */ }
+      document.body.removeChild(t); ok();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, fb);
+    else fb();
+  }
+
+  // ---------- 更新本地图标（教程弹窗） ----------
+  $('btnIcon').addEventListener('click', function () {
+    $('mask').classList.remove('on');
+    $('updMask').classList.remove('on');
+    $('icoMask').classList.add('on');
+  });
+  $('icoClose').addEventListener('click', function () { $('icoMask').classList.remove('on'); });
+  $('icoMask').addEventListener('click', function (e) { if (e.target === $('icoMask')) $('icoMask').classList.remove('on'); });
+  $('icoCopyCmd').addEventListener('click', function () {
+    copyText('python build_data.py && python scripts/local_icons.py && python build_data.py',
+      $('icoCmdTip'), '已复制');
+  });
+
+  // ---------- 截图：结果区（含检索条件）长图 ----------
+  /** 文件名：包含A、B_至少包含C_排除D_2026-11-27_2230.png（没有的组忽略）
+   *  组内用「、」：Windows 文件名不允许 \ / : * ? " < > |，用反斜杠会被浏览器换成下划线，
+   *  反而和组间的 _ 混在一起。 */
+  var SHOT_SEP = '、';
+  function shotFileName(q) {
+    var segs = [];
+    if (q && q.and && q.and.length) segs.push('包含' + q.and.join(SHOT_SEP));
+    if (q && q.or && q.or.length) segs.push('至少包含' + q.or.join(SHOT_SEP));
+    if (q && q.not && q.not.length) segs.push('排除' + q.not.join(SHOT_SEP));
+    var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    var t = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '_' +
+      p(d.getHours()) + p(d.getMinutes());
+    return (segs.length ? segs.join('_') + '_' : '') + t + '.png';
+  }
+
+  var shooting = false;
+  $('btnShot').addEventListener('click', function () {
+    if (shooting) return;
+    if (!S.tag && !S.note && !S.bonus && !S.value) { toast('先检索一次再截图'); return; }
+    shooting = true;
+    var q = (MODE === 'tag' && S.tag && S.tag.query) ? S.tag.query : null;
+    var name = shotFileName(q);
+    toast('正在生成截图…');
+    window.TagShot.capture({
+      el: document.querySelector('main .card'),
+      name: name,
+      onProgress: function (m) { toast(m); }
+    }).then(function (r) {
+      shooting = false;
+      if (r.cancelled) { toast('已取消保存'); return; }
+      /* r.mode：server=服务写进 screenshots；file=另存为自己挑的位置；download=浏览器下载 */
+      var where = r.mode === 'server' ? 'tagsearch/screenshots/' + r.name
+        : r.mode === 'file' ? r.saved
+          : '浏览器下载目录/' + (r.pages > 1 ? r.name.replace(/_\d+\.png$/, '_1.png') + ' 起' : r.name);
+      var msg = (r.pages > 1 && r.mode !== 'file')
+        ? ('结果太长，已分 ' + r.pages + ' 张：' + where)
+        : ('已保存：' + where);
+      toast(msg + '（' + r.width + '×' + r.height + '）');
+    }, function (e) {
+      shooting = false;
+      if (e && e.cancelled) { toast('已取消保存'); return; }
+      toast('截图失败：' + ((e && e.message) ? e.message : e));
+    });
+  });
+
   $('btnUpdate').addEventListener('click', function () {
     $('mask').classList.remove('on');
     $('updMask').classList.add('on');
-    if (!$('updSvc').value) $('updSvc').value = lsGet(SVC_KEY);
-    $('updSt').innerHTML = '<span class="st">未测试</span>';
   });
   $('updClose').addEventListener('click', function () { $('updMask').classList.remove('on'); });
   $('updMask').addEventListener('click', function (e) { if (e.target === $('updMask')) $('updMask').classList.remove('on'); });
-  $('updRun').addEventListener('click', doUpdate);
-  $('updTest').addEventListener('click', function () {
-    lsSet(SVC_KEY, svcBase());
-    ulog('测试 ' + svcBase() + ' …', 'dim');
-    pingSvc(1800).then(function (j) {
-      showSvcState(j);
-      ulog('✓ 服务正常：bsk ' + ((j.bsk && j.bsk.ok) ? '已连接' : '不可用') +
-        (j.hasData ? '，当前 data.js 存在' : '，尚未生成 data.js'), 'ok');
-    }, function (e) { showSvcState(null); ulog('✗ 连接失败：' + ((e && e.message) || e), 'er'); });
-  });
   $('updRe').addEventListener('click', function () {
     reloadDataJs().then(function (db) { applyDb(db, '同目录 data.js'); }, function (e) { ulog('✗ ' + e.message, 'er'); });
   });
@@ -1956,10 +2594,45 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   // 调试/自动化钩子（浏览器控制台或 bsk 可用）
   window.__tagsearch = {
     applyDb: applyDb, reloadDataJs: reloadDataJs, downloadDataJs: downloadDataJs,
-    loadFromText: loadFromText, doUpdate: doUpdate,
+    shotName: function (q) { return shotFileName(q); },
+    loadFromText: loadFromText,
     buildDbFromRaw: buildDbFromRaw, noteLines: noteLines,
-    setMode: setMode, runTag: runTag, runNote: runNote,
+    setMode: setMode, runTag: runTag, runNote: runNote, runBonus: runBonus, runValue: runValue,
     mode: function () { return MODE; },
+    /** 卡片图片接口：注入 fn(hit) → 图片 URL（空字符串 = 占位块）；注入后自动重绘当前结果。
+     *  传 null / 非函数 = 恢复默认解析（读 data.js 的 imgMap）。 */
+    setCardImageResolver: function (fn) {
+      cardImageResolver = typeof fn === 'function' ? fn : defaultCardImageResolver;
+      redraw();
+    },
+    /** 自动化/测试：按 tag id 选中并立即检索加成模式 */
+    setBonusTag: function (id) {
+      var target = document.querySelector('input[name="bonusTag"][value="' + id + '"]');
+      if (!target) return false;
+      Array.prototype.forEach.call(document.querySelectorAll('input[name="bonusTag"]'), function (el) {
+        el.checked = false;
+      });
+      target.checked = true;
+      runBonus();
+      return true;
+    },
+    searchBonus: function (tag) {
+      return core.searchBonus(idx, {
+        tag: tag, includeExcluded: $('showExB').checked, heroes: readHeroes(), sources: readSources()
+      });
+    },
+    /** 自动化/测试：按 tag 名称检索数值数据项 */
+    setValueTag: function (text) {
+      $('valueTag').value = String(text == null ? '' : text);
+      runValue();
+      return readValueTags().length > 0;
+    },
+    searchValue: function (tags) {
+      return core.searchValue(idx, {
+        tags: Array.isArray(tags) ? tags : [tags],
+        includeExcluded: $('showExV').checked, heroes: readHeroes(), sources: readSources()
+      });
+    },
     searchNotes: function (q) {
       return core.searchNotes(idx, {
         q: q, includeExcluded: $('showExN').checked, heroes: readHeroes(), sources: readSources()
@@ -2044,11 +2717,7 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
     }
   };
 
-  // 服务地址默认值：本页由服务打开时用同源，否则用本机默认端口
   (function () {
-    var saved = lsGet(SVC_KEY);
-    var def = /^https?:/.test(location.protocol) ? location.origin : 'http://127.0.0.1:8899';
-    $('updSvc').value = saved || def;
     if (!$('updLog').childNodes.length) {
       ulog('当前数据：' + ($('mTime').textContent) + '（Tag ' + idx.db.tags.length + ' / 技能 ' + idx.abilities.length + ' 条）', 'dim');
       if (NODATA) {
@@ -2157,8 +2826,65 @@ td.nm .hr{color:#8a95a5;font-size:11.5px;font-weight:400;margin-top:1px}
   });
   $('showExN').addEventListener('change', function () { if (S.note) runNote(); });
 
+  // ---------- 加成检索的交互 ----------
+  $('btnRunB').addEventListener('click', function () { runBonus(); });
+  $('bonusTags').addEventListener('change', function (e) {
+    if (!e.target || e.target.name !== 'bonusTag') return;
+    runBonus();
+  });
+  $('btnClearB').addEventListener('click', function () {
+    var el = document.querySelector('input[name="bonusTag"]:checked');
+    if (el) el.checked = false;
+    S.bonus = null; S.bonusHad = false;
+    renderBonusTags();
+    if (MODE === 'bonus') showEmpty(); else $('btnCsv').disabled = !S.tag;
+  });
+  $('showExB').addEventListener('change', function () { if (S.bonus) runBonus(); });
+
+  // ---------- 数值检索的交互 ----------
+  $('btnRunV').addEventListener('click', function () { runValue(); });
+  $('valueTag').addEventListener('focus', function () {
+    renderValueCands(currentValueToken().token);
+  });
+  $('valueTag').addEventListener('input', function () {
+    updateValueTagList(0);
+    renderValueCands(currentValueToken().token);
+  });
+  $('valueTag').addEventListener('keydown', function (e) {
+    var open = !$('valueCands').hidden && valueCandState.list.length > 0;
+    if (e.key === 'ArrowDown' && open) { e.preventDefault(); highlightValueCand(valueCandState.active + 1); return; }
+    if (e.key === 'ArrowUp' && open) { e.preventDefault(); highlightValueCand(valueCandState.active - 1); return; }
+    if (e.key === 'Escape') { hideValueCands(); return; }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (open && valueCandState.active >= 0) pickValueCand(valueCandState.active);
+      else runValue();
+    }
+  });
+  $('valueTag').addEventListener('blur', function () {
+    // 延后关闭，给候选点击留时间（mousedown 已 preventDefault，通常不会 blur）
+    setTimeout(hideValueCands, 120);
+  });
+  $('valueCands').addEventListener('mousedown', function (e) { e.preventDefault(); });
+  $('valueCands').addEventListener('click', function (e) {
+    var vc = e.target.closest ? e.target.closest('.vc') : null;
+    if (!vc) return;
+    var i = parseInt(vc.getAttribute('data-i'), 10);
+    if (!isNaN(i)) pickValueCand(i);
+  });
+  $('btnClearV').addEventListener('click', function () {
+    $('valueTag').value = '';
+    hideValueCands();
+    S.value = null; S.valueHad = false;
+    updateValueTagList(0);
+    $('valueTag').focus();
+    if (MODE === 'value') showEmpty(); else $('btnCsv').disabled = !S.tag;
+  });
+  $('showExV').addEventListener('change', function () { if (S.value) runValue(); });
+
   KINDS.forEach(function (k) { addRow(k, true); });
   updateExpr();
+  renderBonusTags();
   setMode('tag');
 })();
 </script>
